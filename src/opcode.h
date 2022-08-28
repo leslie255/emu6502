@@ -1,4 +1,7 @@
-// Force Interrupt
+// NOP
+#define OPCODE_NOP 0xEA
+
+// BRK
 #define OPCODE_BRK 0x00
 
 // LDA
@@ -28,3 +31,15 @@
 // JMP
 #define OPCODE_JMP_ABS 0x4C // Absolute
 #define OPCODE_JMP_IND 0x6C // Indirect
+
+// PHA
+#define OPCODE_PHA 0x48
+
+// PLA
+#define OPCODE_PLA 0x68
+
+// INX
+#define OPCODE_INX 0xE8
+
+// INY
+#define OPCODE_INY 0xC8

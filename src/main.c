@@ -108,6 +108,20 @@ void emu_update_flags_y(Emulator *emu) {
   emu->cpu.flag_n = ((emu->cpu.y & 0b10000000) > 0);
 }
 
+void emu_print_stack(Emulator *emu) {
+  printf(
+      "\033[1;34m\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n\033[0m");
+  for (usize i = 0x0100; i <= 0x01FF; i += 16) {
+    printf("\033[1;34m%04X\033[0m\t%02X %02X %02X %02X %02X %02X %02X %02X "
+           "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+           (u16)i, emu->mem[i], emu->mem[i + 1], emu->mem[i + 2],
+           emu->mem[i + 3], emu->mem[i + 4], emu->mem[i + 5], emu->mem[i + 6],
+           emu->mem[i + 7], emu->mem[i + 8], emu->mem[i + 9], emu->mem[i + 10],
+           emu->mem[i + 11], emu->mem[i + 12], emu->mem[i + 13],
+           emu->mem[i + 14], emu->mem[i + 15]);
+  }
+}
+
 u8 emu_read_mem_byte(Emulator *emu, u16 addr) { return emu->mem[addr]; }
 
 u16 emu_read_mem_word(Emulator *emu, u16 addr) {
@@ -132,7 +146,9 @@ void emu_execute(Emulator *emu) {
          "Cycles:\t%llu\n"                                                     \
          "CPU status:\n",                                                      \
          opcode, emu->cpu.pc - 1, emu->cycles_executed);                       \
-  cpu_debug_print(&emu->cpu);
+  cpu_debug_print(&emu->cpu);                                                  \
+  printf("Stack:\n");                                                          \
+  emu_print_stack(emu);
 
   u8 opcode = 0x00;
   while (emu->cycles_needed > emu->cycles_executed) {
@@ -142,8 +158,13 @@ void emu_execute(Emulator *emu) {
 
       // BRK
     case OPCODE_BRK: {
-      PRINT_STAT("Force Interrupt (BRK)\n");
+      PRINT_STAT(
+          "Force Interrupt (BRK) hasn't been properly implemented yet\n");
       goto _end_emulation;
+    } break;
+
+      // NOP
+    case OPCODE_NOP: {
     } break;
 
       // LDA
@@ -321,6 +342,34 @@ void emu_execute(Emulator *emu) {
       emu->cycles_executed += 5;
     } break;
 
+      // PHA
+    case OPCODE_PHA: {
+      emu->cpu.sp++;
+      emu->mem[emu->cpu.sp] = emu->cpu.a;
+      emu->cycles_executed += 3;
+    } break;
+
+      // PLA
+    case OPCODE_PLA: {
+      emu->cpu.a = emu_read_mem_byte(emu, emu->cpu.sp);
+      emu->cpu.sp--;
+      emu->cycles_executed += 4;
+    } break;
+
+      // INX
+    case OPCODE_INX: {
+      emu->cpu.x++;
+      emu_update_flags_x(emu);
+      emu->cycles_executed += 2;
+    } break;
+
+      // INY
+    case OPCODE_INY: {
+      emu->cpu.y++;
+      emu_update_flags_y(emu);
+      emu->cycles_executed += 2;
+    } break;
+
     default: {
       PRINT_STAT("Instruction not handled\n");
       goto _end_emulation;
@@ -336,15 +385,13 @@ i32 main() {
   Emulator emu;
   emu_init(&emu, 0xFFFFFFFFFFFFFFFF);
 
-  emu.mem[0x1000] = OPCODE_LDY_IM; // Load Y Immediate Addressing
-  emu.mem[0x1001] = -42;
-  emu.mem[0x1002] = OPCODE_LDX_IM; // Load X Immediate Addressing
-  emu.mem[0x1003] = 1;
-  emu.mem[0x1004] = OPCODE_LDA_ABSX; // Load A Absolute Addressing + X
-  emu.mem[0x1005] = 0x20;
-  emu.mem[0x1006] = 0x00;
-
-  emu.mem[0x2001] = 0xFF;
+  emu.mem[0x1000] = OPCODE_LDA_IM; // Load Y Immediate Addressing
+  emu.mem[0x1001] = 0xAA;
+  emu.mem[0x1002] = OPCODE_PHA; // Push A
+  emu.mem[0x1003] = OPCODE_LDA_IM;
+  emu.mem[0x1004] = 0xBB;
+  emu.mem[0x1005] = OPCODE_PHA;
+  emu.mem[0x1006] = OPCODE_PLA;
 
   // Starting point
   emu.mem[0xFFFC] = OPCODE_JMP_ABS; // Jump Absolute Addressing
