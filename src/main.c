@@ -438,7 +438,7 @@ void emu_tick(Emulator *emu, bool debug_output) {
   case OPCODE_STA_ABS: {
     u16 addr = emu_fetch_word(emu);
     emu->mem[addr] = emu->cpu.a;
-    emu->cycles += 5;
+    emu->cycles += 4;
   } break;
 
   case OPCODE_STA_ABSX: {
@@ -465,6 +465,85 @@ void emu_tick(Emulator *emu, bool debug_output) {
     u16 addr = emu_read_mem_word(emu, addr0) + emu->cpu.y;
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 6;
+  } break;
+
+    // STX
+  case OPCODE_STX_ZP: {
+    u16 addr = emu_fetch_byte(emu);
+    emu->mem[addr] = emu->cpu.x;
+    emu->cycles += 3;
+  } break;
+
+  case OPCODE_STX_ZPY: {
+    u16 addr = emu_fetch_byte(emu) + emu->cpu.y;
+    emu->mem[addr] = emu->cpu.x;
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_STX_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->mem[addr] = emu->cpu.x;
+    emu->cycles += 4;
+  } break;
+
+    // STY
+  case OPCODE_STY_ZP: {
+    u16 addr = emu_fetch_byte(emu);
+    emu->mem[addr] = emu->cpu.y;
+    emu->cycles += 3;
+  } break;
+
+  case OPCODE_STY_ZPX: {
+    u16 addr = emu_fetch_byte(emu) + emu->cpu.x;
+    emu->mem[addr] = emu->cpu.y;
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_STY_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->mem[addr] = emu->cpu.y;
+    emu->cycles += 4;
+  } break;
+
+    // TAX
+  case OPCODE_TAX: {
+    emu->cpu.x = emu->cpu.a;
+    emu_update_flags_x(emu);
+    emu->cycles += 2;
+  } break;
+
+    // TAY
+  case OPCODE_TAY: {
+    emu->cpu.y = emu->cpu.a;
+    emu_update_flags_y(emu);
+    emu->cycles += 2;
+  } break;
+
+    // TSX
+  case OPCODE_TSX: {
+    emu->cpu.x = emu->cpu.sp;
+    emu_update_flags_x(emu);
+    emu->cycles += 2;
+  } break;
+
+    // TXA
+  case OPCODE_TXA: {
+    emu->cpu.a = emu->cpu.x;
+    emu_update_flags_a(emu);
+    emu->cycles += 2;
+  } break;
+
+    // TXS
+  case OPCODE_TXS: {
+    emu->cpu.sp = emu->cpu.x;
+    emu->cycles += 2;
+  } break;
+
+    // TYA
+  case OPCODE_TYA: {
+    emu->cpu.a = emu->cpu.y;
+    emu_update_flags_y(emu);
+    emu->cycles += 2;
   } break;
 
   default: {
