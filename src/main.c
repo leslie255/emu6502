@@ -6,7 +6,7 @@
 
 void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
-typedef struct {
+typedef struct CPU {
   u16 pc;    // Program Counter
   u16 sp;    // Stack Pointer
   u8 a;      // Register A
@@ -24,7 +24,6 @@ typedef struct {
 void cpu_reset(CPU *cpu) {
   cpu->pc = 0xFFFC;
   cpu->sp = 0x0100;
-  cpu->flag_d = 0;
   cpu->flag_c = 0;
   cpu->flag_z = 0;
   cpu->flag_i = 0;
@@ -34,6 +33,37 @@ void cpu_reset(CPU *cpu) {
   cpu->flag_n = 0;
 }
 
+u8 cpu_stat_get_byte(CPU *cpu) {
+  u8 stat = 0;
+  stat |= cpu->flag_c << 6;
+  stat |= cpu->flag_z << 5;
+  stat |= cpu->flag_i << 4;
+  stat |= cpu->flag_d << 3;
+  stat |= cpu->flag_b << 2;
+  stat |= cpu->flag_v << 1;
+  stat |= cpu->flag_n;
+
+  return stat;
+}
+
+void cpu_set_stat_from_byte(CPU *cpu, u8 stat) {
+  cpu->flag_c = (stat & 0x01000000) >> 6;
+  cpu->flag_z = (stat & 0x00100000) >> 5;
+  cpu->flag_i = (stat & 0x00010000) >> 4;
+  cpu->flag_d = (stat & 0x00001000) >> 3;
+  cpu->flag_b = (stat & 0x00000100) >> 2;
+  cpu->flag_v = (stat & 0x00000010) >> 1;
+  cpu->flag_n = stat & 0x00000001;
+}
+
+char zero_or_one(u8 x) {
+  if (x == 0) {
+    return '0';
+  } else {
+    return '1';
+  }
+}
+
 void cpu_debug_print(CPU *cpu) {
   printf("\033[1;33mREG\tHEX\tDEC(u)\tDEC(i)\n\033[0m"
          "PC:\t%04X\t%u\t%d\n"
@@ -41,34 +71,28 @@ void cpu_debug_print(CPU *cpu) {
          "A:\t%02X\t%u\t%d\n"
          "X:\t%02X\t%u\t%d\n"
          "Y:\t%02X\t%u\t%d\n"
-         "C:\t%02X\t%u\t%d\n"
-         "Z:\t%02X\t%u\t%d\n"
-         "I:\t%02X\t%u\t%d\n"
-         "D:\t%02X\t%u\t%d\n"
-         "B:\t%02X\t%u\t%d\n"
-         "V:\t%02X\t%u\t%d\n"
-         "N:\t%02X\t%u\t%d\n",
+         "\033[1;33mC   Z   I   D   B   V   N \033[0m\n"
+         "%c   %c   %c   %c   %c   %c   %c\n",
          cpu->pc, cpu->pc, (i16)cpu->pc, cpu->sp, cpu->sp, (i16)cpu->sp, cpu->a,
          cpu->a, (i8)cpu->a, cpu->x, cpu->x, (i8)cpu->x, cpu->y, cpu->y,
-         (i8)cpu->y, cpu->flag_c, cpu->flag_c, (i8)cpu->flag_c, cpu->flag_z,
-         cpu->flag_z, (i8)cpu->flag_z, cpu->flag_i, cpu->flag_i,
-         (i8)cpu->flag_i, cpu->flag_d, cpu->flag_d, (i8)cpu->flag_d,
-         cpu->flag_b, cpu->flag_b, (i8)cpu->flag_b, cpu->flag_v, cpu->flag_v,
-         (i8)cpu->flag_v, cpu->flag_n, cpu->flag_n, (i8)cpu->flag_n);
+         (i8)cpu->y, zero_or_one(cpu->flag_c), zero_or_one(cpu->flag_z),
+         zero_or_one(cpu->flag_i), zero_or_one(cpu->flag_d),
+         zero_or_one(cpu->flag_b), zero_or_one(cpu->flag_v),
+         zero_or_one(cpu->flag_n));
 }
 
-typedef struct {
+typedef struct Emulator {
   CPU cpu;
   u8 mem[MEM_SIZE];
-  u64 cycles_needed; // number of cycles needed to be executed
-  u64 cycles_executed;
+  u64 cycles;
+  bool is_running;
 } Emulator;
 
-void emu_init(Emulator *emu, u64 cycles) {
+void emu_init(Emulator *emu) {
   cpu_reset(&emu->cpu);
   mem_init(emu->mem);
-  emu->cycles_needed = cycles;
-  emu->cycles_executed = 0;
+  emu->cycles = 0;
+  emu->is_running = true;
 }
 
 // fetch 1 byte from memory on position of PC
@@ -137,267 +161,356 @@ u16 emu_read_mem_word(Emulator *emu, u16 addr) {
   return data;
 }
 
-void emu_execute(Emulator *emu) {
+// Fetch a full address using Indirect addressing mode
+u16 emu_fetch_addr_ind(Emulator *emu) {
+  u16 addr0 = emu_fetch_word(emu);
+  return emu_read_mem_word(emu, addr0);
+}
+
+// Fetch a full address using Indirect + X addressing mode
+u16 emu_fetch_addr_indx(Emulator *emu) {
+  u16 addr0 = emu_fetch_word(emu);
+  addr0 += emu->cpu.x;
+  return emu_read_mem_word(emu, addr0);
+}
+
+void emu_tick(Emulator *emu, bool debug_output) {
 
 #define PRINT_STAT(...)                                                        \
-  printf("\033[1;31m"__VA_ARGS__);                                             \
-  printf("\033[0mOpcode:\t0x%04X\n"                                            \
-         "Addr:\t0x%04X\n"                                                     \
-         "Cycles:\t%llu\n"                                                     \
-         "CPU status:\n",                                                      \
-         opcode, emu->cpu.pc - 1, emu->cycles_executed);                       \
-  cpu_debug_print(&emu->cpu);                                                  \
-  printf("Stack:\n");                                                          \
-  emu_print_stack(emu);
+  if (debug_output) {                                                          \
+    printf("\033[1;31m"__VA_ARGS__);                                           \
+    printf("\033[0mOpcode:\t0x%02X\n"                                          \
+           "Addr:\t0x%04X\n"                                                   \
+           "Cycles:\t%llu\n"                                                   \
+           "CPU status:\n",                                                    \
+           opcode, emu->cpu.pc - 1, emu->cycles);                              \
+    cpu_debug_print(&emu->cpu);                                                \
+    printf("Stack:\n");                                                        \
+    emu_print_stack(emu);                                                      \
+  }
 
   u8 opcode = 0x00;
-  while (emu->cycles_needed > emu->cycles_executed) {
-    opcode = emu_fetch_byte(emu);
+  opcode = emu_fetch_byte(emu);
 
-    switch (opcode) {
+  switch (opcode) {
 
-      // BRK
-    case OPCODE_BRK: {
-      PRINT_STAT(
-          "Force Interrupt (BRK) hasn't been properly implemented yet\n");
-      goto _end_emulation;
-    } break;
+    // BRK
+  case OPCODE_BRK: {
+    PRINT_STAT("Force Interrupt (BRK) hasn't been properly implemented yet\n");
+    emu->is_running = false;
+  } break;
 
-      // NOP
-    case OPCODE_NOP: {
-    } break;
+    // INX
+  case OPCODE_INX: {
+    emu->cpu.x++;
+    emu_update_flags_x(emu);
+    emu->cycles += 2;
+  } break;
 
-      // LDA
-    case OPCODE_LDA_IM: {
-      u8 data = emu_fetch_byte(emu);
-      emu->cpu.a = data;
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 2;
-    } break;
+    // INY
+  case OPCODE_INY: {
+    emu->cpu.y++;
+    emu_update_flags_y(emu);
+    emu->cycles += 2;
+  } break;
 
-    case OPCODE_LDA_ZP: {
-      u8 addr = emu_fetch_byte(emu);
-      emu->cpu.a = emu_read_mem_byte(emu, addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 3;
-    } break;
+    // JMP
+  case OPCODE_JMP_ABS: {
+    PRINT_STAT("JMP instruction\n");
+    u16 addr = emu_fetch_word(emu);
+    emu->cpu.pc = addr;
+    emu->cycles += 3;
+  } break;
 
-    case OPCODE_LDA_ZPX: {
-      u8 addr = emu_fetch_byte(emu);
-      addr += emu->cpu.x;
-      emu->cpu.a = emu_read_mem_byte(emu, addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 4;
-    } break;
+  case OPCODE_JMP_IND: {
+    PRINT_STAT("JMP instruction\n");
+    u16 addr0 = emu_fetch_word(emu);
+    u16 addr = emu_read_mem_word(emu, addr0);
+    emu->cpu.pc = addr;
+    emu->cycles += 5;
+  } break;
 
-    case OPCODE_LDA_ABS: {
-      u16 addr = emu_fetch_word(emu);
-      emu->cpu.a = emu_read_mem_byte(emu, addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 4;
-    } break;
+    // NOP
+  case OPCODE_NOP: {
+  } break;
 
-    case OPCODE_LDA_ABSX: {
-      u16 addr = emu_fetch_word(emu);
-      u16 new_addr = addr + emu->cpu.x;
-      if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-        // page changes, add one cycle
-        emu->cycles_executed++;
-      }
-      emu->cpu.a = emu_read_mem_byte(emu, new_addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 4;
-    } break;
+    // LDA
+  case OPCODE_LDA_IM: {
+    u8 data = emu_fetch_byte(emu);
+    emu->cpu.a = data;
+    emu_update_flags_a(emu);
+    emu->cycles += 2;
+  } break;
 
-    case OPCODE_LDA_ABSY: {
-      u16 addr = emu_fetch_word(emu);
-      u16 new_addr = addr + emu->cpu.y;
-      if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-        // page changes, add one cycle
-        emu->cycles_executed++;
-      }
-      emu->cpu.a = emu_read_mem_byte(emu, new_addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 4;
-    } break;
+  case OPCODE_LDA_ZP: {
+    u8 addr = emu_fetch_byte(emu);
+    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 3;
+  } break;
 
-    case OPCODE_LDA_INDX: {
-      u16 addr0 = emu_fetch_byte(emu);
-      addr0 += emu->cpu.x;
-      u16 addr = emu_read_mem_word(emu, addr0);
-      emu->cpu.a = emu_read_mem_byte(emu, addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 6;
-    } break;
+  case OPCODE_LDA_ZPX: {
+    u8 addr = emu_fetch_byte(emu);
+    addr += emu->cpu.x;
+    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 4;
+  } break;
 
-    case OPCODE_LDA_INDY: {
-      u16 addr0 = emu_fetch_word(emu);
-      u16 addr = emu_read_mem_word(emu, addr0);
-      u16 new_addr = addr + emu->cpu.y;
-      if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-        // page changes, add one cycle
-        emu->cycles_executed++;
-      }
-      emu->cpu.a = emu_read_mem_byte(emu, new_addr);
-      emu_update_flags_a(emu);
-      emu->cycles_executed += 5;
-    } break;
+  case OPCODE_LDA_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 4;
+  } break;
 
-      // LDX
-    case OPCODE_LDX_IM: {
-      u8 data = emu_fetch_byte(emu);
-      emu->cpu.x = data;
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 2;
-    } break;
-
-    case OPCODE_LDX_ZP: {
-      u8 addr = emu_fetch_byte(emu);
-      emu->cpu.x = emu_read_mem_byte(emu, addr);
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 3;
-    } break;
-
-    case OPCODE_LDX_ZPY: {
-      u8 addr = emu_fetch_byte(emu);
-      addr += emu->cpu.y;
-      emu->cpu.x = emu_read_mem_byte(emu, addr);
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-    case OPCODE_LDX_ABS: {
-      u16 addr = emu_fetch_word(emu);
-      emu->cpu.x = emu_read_mem_byte(emu, addr);
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-    case OPCODE_LDX_ABSY: {
-      u16 addr = emu_fetch_word(emu);
-      u16 new_addr = addr + emu->cpu.y;
-      if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-        // page changes, add one cycle
-        emu->cycles_executed++;
-      }
-      emu->cpu.x = emu_read_mem_byte(emu, new_addr);
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-      // LDY
-    case OPCODE_LDY_IM: {
-      u8 data = emu_fetch_byte(emu);
-      emu->cpu.y = data;
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 2;
-    } break;
-
-    case OPCODE_LDY_ZP: {
-      u8 addr = emu_fetch_byte(emu);
-      emu->cpu.y = emu_read_mem_byte(emu, addr);
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 3;
-    } break;
-
-    case OPCODE_LDY_ZPY: {
-      u8 addr = emu_fetch_byte(emu);
-      addr += emu->cpu.y;
-      emu->cpu.y = emu_read_mem_byte(emu, addr);
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-    case OPCODE_LDY_ABS: {
-      u16 addr = emu_fetch_word(emu);
-      emu->cpu.y = emu_read_mem_byte(emu, addr);
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-    case OPCODE_LDY_ABSY: {
-      u16 addr = emu_fetch_word(emu);
-      u16 new_addr = addr + emu->cpu.y;
-      if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-        // page changes, add one cycle
-        emu->cycles_executed++;
-      }
-      emu->cpu.y = emu_read_mem_byte(emu, new_addr);
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 4;
-    } break;
-
-      // JMP
-    case OPCODE_JMP_ABS: {
-      PRINT_STAT("JMP instruction\n");
-      u16 addr = emu_fetch_word(emu);
-      emu->cpu.pc = addr;
-      emu->cycles_executed += 3;
-    } break;
-
-    case OPCODE_JMP_IND: {
-      PRINT_STAT("JMP instruction\n");
-      u16 addr = emu_read_mem_word(emu, emu_fetch_word(emu));
-      emu->cpu.pc = addr;
-      emu->cycles_executed += 5;
-    } break;
-
-      // PHA
-    case OPCODE_PHA: {
-      emu->cpu.sp++;
-      emu->mem[emu->cpu.sp] = emu->cpu.a;
-      emu->cycles_executed += 3;
-    } break;
-
-      // PLA
-    case OPCODE_PLA: {
-      emu->cpu.a = emu_read_mem_byte(emu, emu->cpu.sp);
-      emu->cpu.sp--;
-      emu->cycles_executed += 4;
-    } break;
-
-      // INX
-    case OPCODE_INX: {
-      emu->cpu.x++;
-      emu_update_flags_x(emu);
-      emu->cycles_executed += 2;
-    } break;
-
-      // INY
-    case OPCODE_INY: {
-      emu->cpu.y++;
-      emu_update_flags_y(emu);
-      emu->cycles_executed += 2;
-    } break;
-
-    default: {
-      PRINT_STAT("Instruction not handled\n");
-      goto _end_emulation;
-    } break;
+  case OPCODE_LDA_ABSX: {
+    u16 addr = emu_fetch_word(emu);
+    u16 new_addr = addr + emu->cpu.x;
+    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
+      // page changes, add one cycle
+      emu->cycles++;
     }
+    emu->cpu.a = emu_read_mem_byte(emu, new_addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDA_ABSY: {
+    u16 addr = emu_fetch_word(emu);
+    u16 new_addr = addr + emu->cpu.y;
+    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
+      // page changes, add one cycle
+      emu->cycles++;
+    }
+    emu->cpu.a = emu_read_mem_byte(emu, new_addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDA_INDX: {
+    u16 addr0 = emu_fetch_byte(emu) + emu->cpu.x;
+    u16 addr = emu_read_mem_word(emu, addr0);
+    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 6;
+  } break;
+
+  case OPCODE_LDA_INDY: {
+    u16 addr0 = emu_fetch_word(emu);
+    u16 addr1 = emu_read_mem_word(emu, addr0);
+    u16 addr = addr1 + emu->cpu.y;
+    if ((addr1 & 0xFF00) != (addr & 0xFF00)) {
+      // page changes, add one cycle
+      emu->cycles++;
+    }
+    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu_update_flags_a(emu);
+    emu->cycles += 5;
+  } break;
+
+    // LDX
+  case OPCODE_LDX_IM: {
+    u8 data = emu_fetch_byte(emu);
+    emu->cpu.x = data;
+    emu_update_flags_x(emu);
+    emu->cycles += 2;
+  } break;
+
+  case OPCODE_LDX_ZP: {
+    u8 addr = emu_fetch_byte(emu);
+    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu_update_flags_x(emu);
+    emu->cycles += 3;
+  } break;
+
+  case OPCODE_LDX_ZPY: {
+    u8 addr = emu_fetch_byte(emu);
+    addr += emu->cpu.y;
+    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu_update_flags_x(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDX_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu_update_flags_x(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDX_ABSY: {
+    u16 addr = emu_fetch_word(emu);
+    u16 new_addr = addr + emu->cpu.y;
+    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
+      // page changes, add one cycle
+      emu->cycles++;
+    }
+    emu->cpu.x = emu_read_mem_byte(emu, new_addr);
+    emu_update_flags_x(emu);
+    emu->cycles += 4;
+  } break;
+
+    // LDY
+  case OPCODE_LDY_IM: {
+    u8 data = emu_fetch_byte(emu);
+    emu->cpu.y = data;
+    emu_update_flags_y(emu);
+    emu->cycles += 2;
+  } break;
+
+  case OPCODE_LDY_ZP: {
+    u8 addr = emu_fetch_byte(emu);
+    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu_update_flags_y(emu);
+    emu->cycles += 3;
+  } break;
+
+  case OPCODE_LDY_ZPY: {
+    u8 addr = emu_fetch_byte(emu);
+    addr += emu->cpu.y;
+    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu_update_flags_y(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDY_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu_update_flags_y(emu);
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_LDY_ABSY: {
+    u16 addr = emu_fetch_word(emu);
+    u16 new_addr = addr + emu->cpu.y;
+    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
+      // page changes, add one cycle
+      emu->cycles++;
+    }
+    emu->cpu.y = emu_read_mem_byte(emu, new_addr);
+    emu_update_flags_y(emu);
+    emu->cycles += 4;
+  } break;
+
+    // PHA
+  case OPCODE_PHA: {
+    emu->cpu.sp++;
+    emu->mem[emu->cpu.sp] = emu->cpu.a;
+    emu->cycles += 3;
+  } break;
+
+    // PHP
+  case OPCODE_PHP: {
+    emu->cpu.sp++;
+    emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
+    emu->cycles += 3;
+  } break;
+
+    // PLA
+  case OPCODE_PLA: {
+    emu->cpu.a = emu_read_mem_byte(emu, emu->cpu.sp);
+    emu->cpu.sp--;
+    emu->cycles += 4;
+  } break;
+
+    // PLP
+  case OPCODE_PLP: {
+    u8 stat = emu_read_mem_byte(emu, emu->cpu.sp);
+    cpu_set_stat_from_byte(&emu->cpu, stat);
+    emu->cpu.sp--;
+    emu->cycles += 4;
+  } break;
+
+    // STA
+  case OPCODE_STA_ZP: {
+    u16 addr = emu_fetch_byte(emu);
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 3;
+  } break;
+
+  case OPCODE_STA_ZPX: {
+    u16 addr = emu_fetch_byte(emu) + emu->cpu.x;
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 4;
+  } break;
+
+  case OPCODE_STA_ABS: {
+    u16 addr = emu_fetch_word(emu);
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 5;
+  } break;
+
+  case OPCODE_STA_ABSX: {
+    u16 addr = emu_fetch_word(emu) + emu->cpu.x;
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 5;
+  } break;
+
+  case OPCODE_STA_ABSY: {
+    u16 addr = emu_fetch_word(emu) + emu->cpu.y;
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 5;
+  } break;
+
+  case OPCODE_STA_INDX: {
+    u16 addr0 = emu_fetch_word(emu) + emu->cpu.x;
+    u16 addr = emu_read_mem_word(emu, addr0);
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 6;
+  } break;
+
+  case OPCODE_STA_INDY: {
+    u16 addr0 = emu_fetch_word(emu);
+    u16 addr = emu_read_mem_word(emu, addr0) + emu->cpu.y;
+    emu->mem[addr] = emu->cpu.a;
+    emu->cycles += 6;
+  } break;
+
+  default: {
+    PRINT_STAT("Instruction not handled: 0x%02X\n", opcode);
+    emu->is_running = false;
+  } break;
   }
-  PRINT_STAT("Cycles reached\n");
-_end_emulation:
   return;
 }
 
-i32 main() {
+i32 main(i32 argc, char *argv[]) {
   Emulator emu;
-  emu_init(&emu, 0xFFFFFFFFFFFFFFFF);
+  emu_init(&emu);
 
-  emu.mem[0x1000] = OPCODE_LDA_IM; // Load Y Immediate Addressing
-  emu.mem[0x1001] = 0xAA;
-  emu.mem[0x1002] = OPCODE_PHA; // Push A
+  emu.mem[0x1000] = OPCODE_LDA_IM;
+  emu.mem[0x1001] = -42;
+  emu.mem[0x1002] = OPCODE_PHP;
   emu.mem[0x1003] = OPCODE_LDA_IM;
-  emu.mem[0x1004] = 0xBB;
-  emu.mem[0x1005] = OPCODE_PHA;
-  emu.mem[0x1006] = OPCODE_PLA;
+  emu.mem[0x1004] = 0x00;
+  emu.mem[0x1005] = OPCODE_JMP_ABS;
+  emu.mem[0x1006] = 0x10;
+  emu.mem[0x1007] = 0x08;
+  emu.mem[0x1008] = OPCODE_PLP;
+  emu.mem[0x1009] = OPCODE_LDA_IM;
+  emu.mem[0x100A] = 0xAA;
+  emu.mem[0x100B] = OPCODE_STA_ABS;
+  emu.mem[0x100C] = 0x01;
+  emu.mem[0x100D] = 0xFE;
+  emu.mem[0x100E] = OPCODE_LDX_IM;
+  emu.mem[0x100F] = 0x01;
+  emu.mem[0x1010] = OPCODE_LDA_IM;
+  emu.mem[0x1011] = 0xBB;
+  emu.mem[0x1012] = OPCODE_STA_ABSX;
+  emu.mem[0x1013] = 0x01;
+  emu.mem[0x1014] = 0xFE;
+  emu.mem[0x1015] = OPCODE_PHA;
+  emu.mem[0x1016] = OPCODE_PHP;
 
   // Starting point
-  emu.mem[0xFFFC] = OPCODE_JMP_ABS; // Jump Absolute Addressing
+  emu.mem[0xFFFC] = OPCODE_JMP_ABS;
   emu.mem[0xFFFD] = 0x10;
   emu.mem[0xFFFE] = 0x00;
 
-  emu_execute(&emu);
+  while (emu.is_running) {
+    emu_tick(&emu, true);
+  }
+
   return 0;
 }

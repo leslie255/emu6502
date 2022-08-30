@@ -1,8 +1,18 @@
-// NOP
-#define OPCODE_NOP 0xEA
-
 // BRK
 #define OPCODE_BRK 0x00
+
+// INX
+#define OPCODE_INX 0xE8
+
+// INY
+#define OPCODE_INY 0xC8
+
+// JMP
+#define OPCODE_JMP_ABS 0x4C // Absolute
+#define OPCODE_JMP_IND 0x6C // Indirect
+
+// NOP
+#define OPCODE_NOP 0xEA
 
 // LDA
 #define OPCODE_LDA_IM 0xA9   // Immediate
@@ -28,18 +38,28 @@
 #define OPCODE_LDY_ABS 0xAC  // Absolute Y
 #define OPCODE_LDY_ABSY 0xBC // Absolute Y
 
-// JMP
-#define OPCODE_JMP_ABS 0x4C // Absolute
-#define OPCODE_JMP_IND 0x6C // Indirect
-
 // PHA
 #define OPCODE_PHA 0x48
+
+// PHP
+#define OPCODE_PHP 0x08
 
 // PLA
 #define OPCODE_PLA 0x68
 
-// INX
-#define OPCODE_INX 0xE8
+// PLP
+#define OPCODE_PLP 0x28
 
-// INY
-#define OPCODE_INY 0xC8
+// STA
+#define OPCODE_STA_ZP 0x85    // Zero Page
+#define OPCODE_STA_ZPX 0x95   // Zero Page X
+#define OPCODE_STA_ABS 0x8D   // Absolute
+#define OPCODE_STA_ABSX 0x9D  // Absolute X
+#define OPCODE_STA_ABSY 0x99  // Absolute Y
+#define OPCODE_STA_INDX 0x81  // Indirect X
+#define OPCODE_STA_INDY 0x91  // Indirect Y
+
+// STX
+
+
+// STY
