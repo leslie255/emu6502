@@ -79,6 +79,10 @@ u8 emu_fetch_byte(Emulator *emu) {
   return data;
 }
 
+u16 swap_bytes(u16 data) {
+  return ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
+}
+
 // fetch 2 bytes from memory on position of PC
 u16 emu_fetch_word(Emulator *emu) {
   // 6502 uses little endian
@@ -87,8 +91,8 @@ u16 emu_fetch_word(Emulator *emu) {
   data |= emu->mem[emu->cpu.pc] << 8;
   emu->cpu.pc++;
 
-  if (BIG_ENDIAN) {
-    data = ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
+  if (LITTLE_ENDIAN) {
+    swap_bytes(data);
   }
 
   return data;
