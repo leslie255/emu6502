@@ -4,6 +4,8 @@
 // 64 kB
 #define MEM_SIZE 65536
 
+u16 swap_bytes(u16 data);
+
 typedef struct CPU {
   u16 pc;    // Program Counter
   u16 sp;    // Stack Pointer

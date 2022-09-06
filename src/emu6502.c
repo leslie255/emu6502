@@ -1,7 +1,8 @@
 #include "emu6502.h"
 
-// 64 kB
-#define MEM_SIZE 65536
+#include <ncurses.h>
+
+char log_buffer[1024] = {0};
 
 void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
@@ -49,13 +50,13 @@ char zero_or_one(u8 x) {
 }
 
 void cpu_debug_print(CPU *cpu) {
-  printf("\033[1;33mREG\tHEX\tDEC(u)\tDEC(i)\n\033[0m"
+  printw("REG\tHEX\tDEC(u)\tDEC(i)\n"
          "PC:\t%04X\t%u\t%d\n"
          "SP:\t%04X\t%u\t%d\n"
          "A:\t%02X\t%u\t%d\n"
          "X:\t%02X\t%u\t%d\n"
          "Y:\t%02X\t%u\t%d\n"
-         "\033[1;33mC   Z   I   D   B   V   N \033[0m\n"
+         "C   Z   I   D   B   V   N \n"
          "%c   %c   %c   %c   %c   %c   %c\n",
          cpu->pc, cpu->pc, (i16)cpu->pc, cpu->sp, cpu->sp, (i16)cpu->sp, cpu->a,
          cpu->a, (i8)cpu->a, cpu->x, cpu->x, (i8)cpu->x, cpu->y, cpu->y,
@@ -84,6 +85,7 @@ u16 swap_bytes(u16 data) {
 }
 
 // fetch 2 bytes from memory on position of PC
+// swap bytes if host is big endian
 u16 emu_fetch_word(Emulator *emu) {
   // 6502 uses little endian
   u16 data = emu->mem[emu->cpu.pc];
@@ -91,8 +93,8 @@ u16 emu_fetch_word(Emulator *emu) {
   data |= emu->mem[emu->cpu.pc] << 8;
   emu->cpu.pc++;
 
-  if (LITTLE_ENDIAN) {
-    swap_bytes(data);
+  if (BIG_ENDIAN) {
+    data = swap_bytes(data);
   }
 
   return data;
@@ -114,10 +116,9 @@ void emu_update_flags_y(Emulator *emu) {
 }
 
 void emu_print_stack(Emulator *emu) {
-  printf(
-      "\033[1;34m\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n\033[0m");
+  printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
   for (usize i = 0x0100; i <= 0x01FF; i += 16) {
-    printf("\033[1;34m%04X\033[0m\t%02X %02X %02X %02X %02X %02X %02X %02X "
+    printw("%04X\t%02X %02X %02X %02X %02X %02X %02X %02X "
            "%02X %02X %02X %02X %02X %02X %02X %02X\n",
            (u16)i, emu->mem[i], emu->mem[i + 1], emu->mem[i + 2],
            emu->mem[i + 3], emu->mem[i + 4], emu->mem[i + 5], emu->mem[i + 6],
@@ -136,7 +137,7 @@ u16 emu_read_mem_word(Emulator *emu, u16 addr) {
   emu->cpu.pc++;
 
   if (BIG_ENDIAN) {
-    data = ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
+    data = swap_bytes(data);
   }
 
   return data;
@@ -146,14 +147,16 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
 #define PRINT_STAT(...)                                                        \
   if (debug_output) {                                                          \
-    printf("\033[1;31m"__VA_ARGS__);                                           \
-    printf("\033[0mOpcode:\t0x%02X\n"                                          \
+    printw(""__VA_ARGS__);                                                     \
+    printw("Opcode:\t0x%02X\n"                                                 \
            "Addr:\t0x%04X\n"                                                   \
            "Cycles:\t%llu\n"                                                   \
            "CPU status:\n",                                                    \
            opcode, emu->cpu.pc - 1, emu->cycles);                              \
+    printw("log: -----------\n%s\n----------\n", log_buffer);                  \
+    bzero(log_buffer, sizeof(log_buffer));                                     \
     cpu_debug_print(&emu->cpu);                                                \
-    printf("Stack:\n");                                                        \
+    printw("Stack:\n");                                                        \
     emu_print_stack(emu);                                                      \
   }
 
@@ -184,14 +187,13 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // JMP
   case OPCODE_JMP_ABS: {
-    PRINT_STAT("JMP instruction\n");
     u16 addr = emu_fetch_word(emu);
+    sprintf(log_buffer, "JMP_ABS: 0x%04x", addr);
     emu->cpu.pc = addr;
     emu->cycles += 3;
   } break;
 
   case OPCODE_JMP_IND: {
-    PRINT_STAT("JMP instruction\n");
     u16 addr0 = emu_fetch_word(emu);
     u16 addr = emu_read_mem_word(emu, addr0);
     emu->cpu.pc = addr;
@@ -269,12 +271,14 @@ void emu_tick(Emulator *emu, bool debug_output) {
     u16 addr1 = emu_read_mem_word(emu, addr0);
     u16 addr = addr1 + emu->cpu.y;
     if ((addr1 & 0xFF00) != (addr & 0xFF00)) {
-      // page changes, add one cycle
+      // if page changes, add one cycle
       emu->cycles++;
     }
     emu->cpu.a = emu_read_mem_byte(emu, addr);
     emu_update_flags_a(emu);
     emu->cycles += 5;
+    sprintf(log_buffer, "LDA_INDY:\naddr0:\t%04X\naddr1:\t%04X\naddr:\t%04X",
+            addr0, addr1, addr);
   } break;
 
     // LDX
@@ -515,9 +519,9 @@ void emu_tick(Emulator *emu, bool debug_output) {
   } break;
 
   default: {
-    PRINT_STAT("Instruction not handled: 0x%02X\n", opcode);
     emu->is_running = false;
   } break;
   }
+  PRINT_STAT("", opcode);
   return;
 }
