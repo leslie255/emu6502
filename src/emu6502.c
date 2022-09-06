@@ -2,7 +2,7 @@
 
 #include <ncurses.h>
 
-char log_buffer[1024] = {0};
+static char log_buffer[1024] = {0};
 
 void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
@@ -134,7 +134,6 @@ u16 emu_read_mem_word(Emulator *emu, u16 addr) {
   // 6502 uses little endian
   u16 data = emu->mem[addr];
   data |= emu->mem[addr + 1] << 8;
-  emu->cpu.pc++;
 
   if (BIG_ENDIAN) {
     data = swap_bytes(data);
@@ -153,11 +152,11 @@ void emu_tick(Emulator *emu, bool debug_output) {
            "Cycles:\t%llu\n"                                                   \
            "CPU status:\n",                                                    \
            opcode, emu->cpu.pc - 1, emu->cycles);                              \
-    printw("log: -----------\n%s\n----------\n", log_buffer);                  \
-    bzero(log_buffer, sizeof(log_buffer));                                     \
     cpu_debug_print(&emu->cpu);                                                \
     printw("Stack:\n");                                                        \
     emu_print_stack(emu);                                                      \
+    printw("log: -----------\n%s\n----------\n", log_buffer);                  \
+    bzero(log_buffer, sizeof(log_buffer));                                     \
   }
 
   u8 opcode = 0x00;

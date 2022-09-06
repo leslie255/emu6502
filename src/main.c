@@ -3,6 +3,7 @@
 #include "opcode.h"
 
 #include <ncurses.h>
+#include <unistd.h>
 
 typedef struct MemWriter {
   u8 *mem;
@@ -35,10 +36,18 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&memw, 0x0800);
 
   memw.pointer = 0x0800;
-  mem_write_byte(&memw, OPCODE_LDY_IM);
-  mem_write_byte(&memw, 0x00);
+  mem_write_byte(&memw, OPCODE_LDY_IM); // 0800
+  mem_write_byte(&memw, 0x00);          // 0801
+  mem_write_byte(&memw, OPCODE_LDA_IM);
+  mem_write_byte(&memw, 0xFF);
+  mem_write_byte(&memw, OPCODE_LDA_IM);
+  mem_write_byte(&memw, 0xF0);
   mem_write_byte(&memw, OPCODE_LDA_INDY);
   mem_write_word(&memw, 0x1000);
+  mem_write_byte(&memw, OPCODE_LDA_IM);
+  mem_write_byte(&memw, 0xEE);
+  mem_write_byte(&memw, OPCODE_LDA_IM);
+  mem_write_byte(&memw, 0xE0);
 
   memw.pointer = 0x1000;
   mem_write_word(&memw, 0x2000);
@@ -47,12 +56,17 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_byte(&memw, -42);
 
   initscr();
-  noecho();
   curs_set(0);
-  while (emu.is_running) {
+  while (true) {
     clear();
     emu_tick(&emu, true);
-    getch();
+    refresh();
+	if (!emu.is_running) {
+	  break;
+	}
+    printw("\nPress n to continue to tick 1 instruction\n");
+    while (getch() != 'n')
+      ;
   }
   endwin();
   return 0;
