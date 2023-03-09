@@ -8,7 +8,7 @@ void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
 void cpu_reset(CPU *cpu) {
   cpu->pc = 0xFFFC;
-  cpu->sp = 0x0100;
+  cpu->sp = 0x00FF;
   cpu->flag_c = 0;
   cpu->flag_z = 0;
   cpu->flag_i = 0;
@@ -159,7 +159,7 @@ void emu_tick(Emulator *emu, bool debug_output) {
     bzero(log_buffer, sizeof(log_buffer));                                     \
   }
 
-  u8 opcode = 0x00;
+  u8 opcode;
   opcode = emu_fetch_byte(emu);
 
   switch (opcode) {
@@ -369,6 +369,10 @@ void emu_tick(Emulator *emu, bool debug_output) {
     emu->cpu.sp++;
     emu->mem[emu->cpu.sp] = emu->cpu.a;
     emu->cycles += 3;
+    if (emu->cpu.sp > 0x01FF) {
+      sprintf(log_buffer, "Stack overflowed");
+      emu->is_running = false;
+    }
   } break;
 
     // PHP
@@ -376,6 +380,10 @@ void emu_tick(Emulator *emu, bool debug_output) {
     emu->cpu.sp++;
     emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
     emu->cycles += 3;
+    if (emu->cpu.sp > 0x01FF) {
+      sprintf(log_buffer, "Stack overflowed");
+      emu->is_running = false;
+    }
   } break;
 
     // PLA
@@ -383,6 +391,10 @@ void emu_tick(Emulator *emu, bool debug_output) {
     emu->cpu.a = emu_read_mem_byte(emu, emu->cpu.sp);
     emu->cpu.sp--;
     emu->cycles += 4;
+    if (emu->cpu.sp < 0x100) {
+      sprintf(log_buffer, "Stack underflowed");
+      emu->is_running = false;
+    }
   } break;
 
     // PLP
@@ -391,6 +403,10 @@ void emu_tick(Emulator *emu, bool debug_output) {
     cpu_set_stat_from_byte(&emu->cpu, stat);
     emu->cpu.sp--;
     emu->cycles += 4;
+    if (emu->cpu.sp < 0x100) {
+      sprintf(log_buffer, "Stack underflowed");
+      emu->is_running = false;
+    }
   } break;
 
     // STA
