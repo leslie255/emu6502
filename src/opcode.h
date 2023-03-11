@@ -8,6 +8,8 @@
 // INDX: (Indirect, X)
 // INDY: Indirect, (Y)
 
+#include <curses.h>
+#include <unistd.h>
 #define OPCODE_BRK 0x00
 
 #define OPCODE_DEC_ZP 0xC6
@@ -30,6 +32,8 @@
 
 #define OPCODE_JMP_ABS 0x4C
 #define OPCODE_JMP_IND 0x6C
+
+#define OPCODE_JSR_ABS 0x20
 
 #define OPCODE_NOP 0xEA
 
