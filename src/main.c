@@ -38,9 +38,11 @@ i32 main(i32 argc, char *argv[]) {
   writer.head = 0x0800;
   mem_write_byte(&writer, OPCODE_LDA_IM);
   mem_write_byte(&writer, 255);
-  mem_write_byte(&writer, OPCODE_PHA); // 0x0802
+  mem_write_byte(&writer, OPCODE_PHA);
+  mem_write_byte(&writer, OPCODE_INC_ABS); // 0x0803
+  mem_write_word(&writer, 0x0100);
   mem_write_byte(&writer, OPCODE_JMP_ABS);
-  mem_write_word(&writer, 0x0802);
+  mem_write_word(&writer, 0x0803);
 
   initscr();
   noecho();

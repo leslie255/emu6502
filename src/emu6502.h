@@ -38,7 +38,8 @@ void cpu_reset(CPU *cpu);
 // Get the status flags of the CPU as a single byte
 u8 cpu_stat_get_byte(CPU *cpu);
 
-// Set the status flags from the output of `cpu_stat_get_byte(...)`
+// Set the status flags from a single byte, in the same format of
+// `cpu_stat_get_byte(...)`
 void cpu_set_stat_from_byte(CPU *cpu, u8 stat);
 
 // Outputs the registers and status flags of a CPU
@@ -53,13 +54,6 @@ u8 emu_fetch_byte(Emulator *emu);
 // Fetch 2 bytes from memory on position of PC
 u16 emu_fetch_word(Emulator *emu);
 
-// Update CPU flags based on the Accumulator
-void emu_update_flags_a(Emulator *emu);
-// Update CPU flags based on the X register
-void emu_update_flags_x(Emulator *emu);
-// Update CPU flags based on the Y register
-void emu_update_flags_y(Emulator *emu);
-
 // Outputs the stack (memory address 0x0100 ~ 0x01FF)
 // Output has newline characters
 void emu_print_stack(Emulator *emu);
@@ -70,5 +64,6 @@ u8 emu_read_mem_byte(Emulator *emu, u16 addr);
 u16 emu_read_mem_word(Emulator *emu, u16 addr);
 
 // Execute one instruction
-// `debug_output`: whether or not to output debug information for every interrupt and jump instruction
+// `debug_output`: whether or not to output debug information for every
+// interrupt and jump instruction
 void emu_tick(Emulator *emu, bool debug_output);
