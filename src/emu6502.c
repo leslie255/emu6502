@@ -152,6 +152,7 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
 
 // update flags in the CPU according to a byte
 static inline void set_flags(Emulator *emu, const u8 byte) {
+  cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_z = (byte == 0);
   emu->cpu.flag_n = (i8)byte > 0;
 }
