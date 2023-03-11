@@ -1,5 +1,4 @@
-#ifndef COMMON_H
-#define COMMON_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -23,4 +22,6 @@ typedef double f64;
 typedef size_t usize;
 typedef ssize_t isize;
 
-#endif
+static inline u16 swap_bytes(const u16 data) {
+  return ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
+}

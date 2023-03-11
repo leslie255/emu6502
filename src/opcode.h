@@ -10,6 +10,11 @@
 
 #define OPCODE_BRK 0x00
 
+#define OPCODE_CMP_IM 0xC9
+#define OPCODE_CMP_ZP 0xC5
+#define OPCODE_CMP_ZPX 0xC5
+#define OPCODE_CMP_ZPY 0xC5
+
 #define OPCODE_DEC_ZP 0xC6
 #define OPCODE_DEC_ZPX 0xD6
 #define OPCODE_DEC_ABS 0xCE

@@ -18,7 +18,7 @@ void cpu_reset(CPU *cpu) {
   cpu->flag_n = 0;
 }
 
-u8 cpu_stat_get_byte(CPU *cpu) {
+u8 cpu_stat_get_byte(const CPU *cpu) {
   u8 stat = 0;
   stat |= cpu->flag_c << 6;
   stat |= cpu->flag_z << 5;
@@ -31,7 +31,7 @@ u8 cpu_stat_get_byte(CPU *cpu) {
   return stat;
 }
 
-void cpu_set_stat_from_byte(CPU *cpu, u8 stat) {
+void cpu_set_stat_from_byte(CPU *cpu, const u8 stat) {
   cpu->flag_c = (stat & 0x01000000) >> 6;
   cpu->flag_z = (stat & 0x00100000) >> 5;
   cpu->flag_i = (stat & 0x00010000) >> 4;
@@ -41,15 +41,9 @@ void cpu_set_stat_from_byte(CPU *cpu, u8 stat) {
   cpu->flag_n = stat & 0x00000001;
 }
 
-static inline char zero_or_one(u8 x) {
-  if (x == 0) {
-    return '0';
-  } else {
-    return '1';
-  }
-}
+static inline char zero_or_one(const u8 x) { return (x == 0) ? '0' : '1'; }
 
-void cpu_debug_print(CPU *cpu) {
+void cpu_debug_print(const CPU *cpu) {
   printw("REG\tHEX\tDEC(u)\tDEC(i)\n"
          "PC:\t%04X\t%u\t%d\n"
          "SP:\t%04X\t%u\t%d\n"
@@ -74,19 +68,15 @@ void emu_init(Emulator *emu) {
 }
 
 // fetch 1 byte from memory on position of PC
-u8 emu_fetch_byte(Emulator *emu) {
+static inline u8 fetch_byte(Emulator *emu) {
   u8 data = emu->mem[emu->cpu.pc];
   emu->cpu.pc++;
   return data;
 }
 
-u16 swap_bytes(u16 data) {
-  return ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
-}
-
 // fetch 2 bytes from memory on position of PC
 // swap bytes if host is big endian
-u16 emu_fetch_word(Emulator *emu) {
+static inline u16 fetch_word(Emulator *emu) {
   // 6502 uses little endian
   u16 data = emu->mem[emu->cpu.pc];
   emu->cpu.pc++;
@@ -100,27 +90,75 @@ u16 emu_fetch_word(Emulator *emu) {
   return data;
 }
 
-static inline void emu_update_flags_a(Emulator *emu) {
-  emu->cpu.flag_z = (emu->cpu.a == 0);
-  emu->cpu.flag_n = ((emu->cpu.a & 0b10000000) > 0);
+// result of an address fetch which leads to a page cross (which will cause one
+// extra cycle)
+struct addr_fetch_result {
+  u16 addr;
+  bool page_crossed;
+};
+
+// get an address on the position of PC by addressing mode Zero Page
+static inline u16 fetch_addr_zp(Emulator *emu) { return fetch_byte(emu); }
+
+// get an address on the position of PC by addressing mode Zero Page X
+static inline u16 fetch_addr_zpx(Emulator *emu) {
+  return fetch_byte(emu) + emu->cpu.x;
 }
 
-static inline void emu_update_flags_x(Emulator *emu) {
-  emu->cpu.flag_z = (emu->cpu.x == 0);
-  emu->cpu.flag_n = ((emu->cpu.x & 0b10000000) > 0);
+// get an address on the position of PC by addressing mode Zero Page Y
+static inline u16 fetch_addr_zpy(Emulator *emu) {
+  return fetch_byte(emu) + emu->cpu.y;
 }
 
-static inline void emu_update_flags_y(Emulator *emu) {
-  emu->cpu.flag_z = (emu->cpu.y == 0);
-  emu->cpu.flag_n = ((emu->cpu.y & 0b10000000) > 0);
+// get an address on the position of PC by addressing mode Absolute
+static inline u16 fetch_addr_abs(Emulator *emu) { return fetch_word(emu); }
+
+// get an address on the position of PC by Absolute,X addressing mode
+static inline struct addr_fetch_result fetch_addr_absx(Emulator *emu) {
+  const u16 addr0 = fetch_word(emu);
+  const u16 addr1 = addr0 + emu->cpu.x;
+  const bool page_crossed = ((addr0 & 0xFF00) != (addr1 & 0xFF00));
+  return (struct addr_fetch_result){addr1, page_crossed};
 }
 
-static inline void emu_update_flags_byte(Emulator *emu, u8 byte) {
-  emu->cpu.flag_n = (byte == 0);
-  emu->cpu.flag_n = (byte > 0);
+// get an address on the position of PC by addressing mode (Indirect, X)
+static inline u16 fetch_addr_indx(Emulator *emu) {
+  const u16 addr0 = fetch_word(emu) + emu->cpu.x;
+  const u16 addr1 = emu_read_mem_word(emu, addr0);
+  return addr1;
 }
 
-void emu_print_stack(Emulator *emu) {
+// get an address on the position of PC by addressing mode (Indirect, Y)
+static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
+  const u16 addr0 = fetch_word(emu);
+  const u16 addr1 = emu_read_mem_word(emu, addr0) + emu->cpu.y;
+  const bool page_crossed = ((addr0 & 0xFF00) != (addr1 & 0xFF00));
+  sprintf(log_buffer, "IND,Y:\n\taddr0:%04X\n\taddr1:%04X\n", addr0, addr1);
+  return (struct addr_fetch_result){addr1, page_crossed};
+}
+
+// update flags in the CPU according to a byte
+static inline void update_flags_byte(Emulator *emu, const u8 byte) {
+  emu->cpu.flag_z = (byte == 0);
+  emu->cpu.flag_n = (i8)byte > 0;
+}
+
+// update flags in the CPU according to register A
+static inline void update_flags_a(Emulator *emu) {
+  update_flags_byte(emu, emu->cpu.a);
+}
+
+// update flags in the CPU according to register X
+static inline void update_flags_x(Emulator *emu) {
+  update_flags_byte(emu, emu->cpu.x);
+}
+
+// update flags in the CPU according to register Y
+static inline void update_flags_y(Emulator *emu) {
+  update_flags_byte(emu, emu->cpu.y);
+}
+
+void emu_print_stack(const Emulator *emu) {
   printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
   for (usize i = 0x0100; i <= 0x01FF; i += 16) {
     printw("%04X\t%02X %02X %02X %02X %02X %02X %02X %02X "
@@ -133,9 +171,9 @@ void emu_print_stack(Emulator *emu) {
   }
 }
 
-u8 emu_read_mem_byte(Emulator *emu, u16 addr) { return emu->mem[addr]; }
+u8 emu_read_mem_byte(const Emulator *emu, const u16 addr) { return emu->mem[addr]; }
 
-u16 emu_read_mem_word(Emulator *emu, u16 addr) {
+u16 emu_read_mem_word(const Emulator *emu, const u16 addr) {
   // 6502 uses little endian
   u16 data = emu->mem[addr];
   data |= emu->mem[addr + 1] << 8;
@@ -147,7 +185,7 @@ u16 emu_read_mem_word(Emulator *emu, u16 addr) {
   return data;
 }
 
-void emu_tick(Emulator *emu, bool debug_output) {
+void emu_tick(Emulator *emu, const bool debug_output) {
 
 #define PRINT_STAT(...)                                                        \
   if (debug_output) {                                                          \
@@ -164,8 +202,7 @@ void emu_tick(Emulator *emu, bool debug_output) {
     bzero(log_buffer, sizeof(log_buffer));                                     \
   }
 
-  u8 opcode;
-  opcode = emu_fetch_byte(emu);
+  const u8 opcode = fetch_byte(emu);
 
   switch (opcode) {
 
@@ -178,111 +215,107 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // DEC
   case OPCODE_DEC_ZP: {
-    const u16 addr = (u16)emu_fetch_byte(emu);
+    const u16 addr = fetch_addr_zp(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)--;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 3;
   } break;
   case OPCODE_DEC_ZPX: {
-    const u16 addr = (u16)emu_fetch_byte(emu) + (u16)emu->cpu.x;
+    const u16 addr = fetch_addr_zpx(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)--;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 3;
   } break;
   case OPCODE_DEC_ABS: {
-    const u16 addr = emu_fetch_word(emu);
+    const u16 addr = fetch_word(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)--;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 4;
   } break;
   case OPCODE_DEC_ABSX: {
-    const u16 addr = emu_fetch_word(emu);
-    const u16 new_addr = addr + (u16)emu->cpu.x;
-    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-      // page crossed
-      emu->cycles += 1;
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
     }
-    u8 *byte = &emu->mem[addr];
+    u8 *byte = &emu->mem[result.addr];
     (*byte)--;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 4;
   } break;
 
     // INX
   case OPCODE_INX: {
     emu->cpu.x--;
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 2;
   } break;
 
     // INY
   case OPCODE_INY: {
     emu->cpu.y--;
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 2;
   } break;
 
     // INC
   case OPCODE_INC_ZP: {
-    const u16 addr = (u16)emu_fetch_byte(emu);
+    const u16 addr = fetch_addr_zp(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)++;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 3;
   } break;
   case OPCODE_INC_ZPX: {
-    const u16 addr = (u16)emu_fetch_byte(emu) + (u16)emu->cpu.x;
+    const u16 addr = fetch_addr_zpx(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)++;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 3;
   } break;
   case OPCODE_INC_ABS: {
-    const u16 addr = emu_fetch_word(emu);
+    const u16 addr = fetch_word(emu);
     u8 *byte = &emu->mem[addr];
     (*byte)++;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 4;
   } break;
   case OPCODE_INC_ABSX: {
-    const u16 addr = emu_fetch_word(emu);
-    const u16 new_addr = addr + (u16)emu->cpu.x;
-    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-      // page crossed
-      emu->cycles += 1;
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
     }
-    u8 *byte = &emu->mem[addr];
+    u8 *byte = &emu->mem[result.addr];
     (*byte)++;
-    emu_update_flags_byte(emu, *byte);
+    update_flags_byte(emu, *byte);
     emu->cycles += 4;
   } break;
 
     // DEX
   case OPCODE_DEX: {
     emu->cpu.x++;
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 2;
   } break;
 
     // DEY
   case OPCODE_DEY: {
     emu->cpu.y++;
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 2;
   } break;
 
     // JMP
   case OPCODE_JMP_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     sprintf(log_buffer, "JMP_ABS: 0x%04x", addr);
     emu->cpu.pc = addr;
     emu->cycles += 3;
   } break;
   case OPCODE_JMP_IND: {
-    u16 addr0 = emu_fetch_word(emu);
+    u16 addr0 = fetch_word(emu);
     u16 addr = emu_read_mem_word(emu, addr0);
     sprintf(log_buffer, "JMP_IND: 0x%04x", addr);
     emu->cpu.pc = addr;
@@ -291,7 +324,7 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // JSR
   case OPCODE_JSR_ABS: {
-    const u16 jmp_addr = emu_fetch_word(emu);
+    const u16 jmp_addr = fetch_word(emu);
     const u16 ret_addr = emu->cpu.pc;
     emu->cpu.sp++;
     emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
@@ -310,147 +343,136 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // LDA
   case OPCODE_LDA_IM: {
-    u8 data = emu_fetch_byte(emu);
+    const u8 data = fetch_byte(emu);
     emu->cpu.a = data;
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 2;
   } break;
   case OPCODE_LDA_ZP: {
-    u8 addr = emu_fetch_byte(emu);
+    const u16 addr = fetch_addr_zp(emu);
     emu->cpu.a = emu_read_mem_byte(emu, addr);
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDA_ZPX: {
-    u8 addr = emu_fetch_byte(emu);
-    addr += emu->cpu.x;
+    const u16 addr = fetch_addr_zpx(emu);
     emu->cpu.a = emu_read_mem_byte(emu, addr);
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     emu->cpu.a = emu_read_mem_byte(emu, addr);
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABSX: {
-    u16 addr = emu_fetch_word(emu);
-    u16 new_addr = addr + emu->cpu.x;
-    if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
-      // page changes, add one cycle
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.a = emu_read_mem_byte(emu, new_addr);
-    emu_update_flags_a(emu);
+    emu->cpu.a = emu_read_mem_byte(emu, result.addr);
+    update_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABSY: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     u16 new_addr = addr + emu->cpu.y;
     if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
       // page changes, add one cycle
       emu->cycles++;
     }
     emu->cpu.a = emu_read_mem_byte(emu, new_addr);
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_INDX: {
-    u16 addr0 = emu_fetch_byte(emu) + emu->cpu.x;
-    u16 addr = emu_read_mem_word(emu, addr0);
+    const u16 addr = fetch_addr_indx(emu);
     emu->cpu.a = emu_read_mem_byte(emu, addr);
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 6;
   } break;
   case OPCODE_LDA_INDY: {
-    u16 addr0 = emu_fetch_word(emu);
-    u16 addr1 = emu_read_mem_word(emu, addr0);
-    u16 addr = addr1 + emu->cpu.y;
-    if ((addr1 & 0xFF00) != (addr & 0xFF00)) {
-      // if page changes, add one cycle
+    const __auto_type result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.a = emu_read_mem_byte(emu, addr);
-    emu_update_flags_a(emu);
+    emu->cpu.a = emu_read_mem_byte(emu, result.addr);
+    update_flags_a(emu);
     emu->cycles += 5;
-    sprintf(log_buffer, "LDA_INDY:\naddr0:\t%04X\naddr1:\t%04X\naddr:\t%04X",
-            addr0, addr1, addr);
   } break;
 
     // LDX
   case OPCODE_LDX_IM: {
-    u8 data = emu_fetch_byte(emu);
+    u8 data = fetch_byte(emu);
     emu->cpu.x = data;
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 2;
   } break;
   case OPCODE_LDX_ZP: {
-    u8 addr = emu_fetch_byte(emu);
+    const u8 addr = fetch_addr_zp(emu);
     emu->cpu.x = emu_read_mem_byte(emu, addr);
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDX_ZPY: {
-    u8 addr = emu_fetch_byte(emu);
-    addr += emu->cpu.y;
+    const u16 addr = fetch_addr_zpy(emu);
     emu->cpu.x = emu_read_mem_byte(emu, addr);
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDX_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     emu->cpu.x = emu_read_mem_byte(emu, addr);
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDX_ABSY: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     u16 new_addr = addr + emu->cpu.y;
     if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
       // page changes, add one cycle
       emu->cycles++;
     }
     emu->cpu.x = emu_read_mem_byte(emu, new_addr);
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 4;
   } break;
 
     // LDY
   case OPCODE_LDY_IM: {
-    u8 data = emu_fetch_byte(emu);
+    u8 data = fetch_byte(emu);
     emu->cpu.y = data;
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 2;
   } break;
   case OPCODE_LDY_ZP: {
-    u8 addr = emu_fetch_byte(emu);
+    const u16 addr = fetch_addr_zp(emu);
     emu->cpu.y = emu_read_mem_byte(emu, addr);
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDY_ZPY: {
-    u8 addr = emu_fetch_byte(emu);
-    addr += emu->cpu.y;
+    const u16 addr = fetch_addr_zpy(emu);
     emu->cpu.y = emu_read_mem_byte(emu, addr);
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDY_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     emu->cpu.y = emu_read_mem_byte(emu, addr);
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDY_ABSY: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     u16 new_addr = addr + emu->cpu.y;
     if ((addr & 0xFF00) != (new_addr & 0xFF00)) {
       // page changes, add one cycle
       emu->cycles++;
     }
     emu->cpu.y = emu_read_mem_byte(emu, new_addr);
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 4;
   } break;
 
@@ -501,73 +523,77 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // STA
   case OPCODE_STA_ZP: {
-    u16 addr = emu_fetch_byte(emu);
+    const u16 addr = fetch_addr_zp(emu);
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 3;
   } break;
   case OPCODE_STA_ZPX: {
-    u16 addr = emu_fetch_byte(emu) + emu->cpu.x;
+    const u16 addr = fetch_addr_zpx(emu);
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 4;
   } break;
   case OPCODE_STA_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    const u16 addr = fetch_addr_abs(emu);
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 4;
   } break;
   case OPCODE_STA_ABSX: {
-    u16 addr = emu_fetch_word(emu) + emu->cpu.x;
-    emu->mem[addr] = emu->cpu.a;
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    emu->mem[result.addr] = emu->cpu.a;
     emu->cycles += 5;
   } break;
   case OPCODE_STA_ABSY: {
-    u16 addr = emu_fetch_word(emu) + emu->cpu.y;
+    const u16 addr = fetch_word(emu) + emu->cpu.y;
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 5;
   } break;
   case OPCODE_STA_INDX: {
-    u16 addr0 = emu_fetch_word(emu) + emu->cpu.x;
-    u16 addr = emu_read_mem_word(emu, addr0);
+    const u16 addr = fetch_addr_indx(emu);
     emu->mem[addr] = emu->cpu.a;
     emu->cycles += 6;
   } break;
   case OPCODE_STA_INDY: {
-    u16 addr0 = emu_fetch_word(emu);
-    u16 addr = emu_read_mem_word(emu, addr0) + emu->cpu.y;
-    emu->mem[addr] = emu->cpu.a;
+    const __auto_type result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    emu->mem[result.addr] = emu->cpu.a;
     emu->cycles += 6;
   } break;
 
     // STX
   case OPCODE_STX_ZP: {
-    u16 addr = emu_fetch_byte(emu);
+    u16 addr = fetch_byte(emu);
     emu->mem[addr] = emu->cpu.x;
     emu->cycles += 3;
   } break;
   case OPCODE_STX_ZPY: {
-    u16 addr = emu_fetch_byte(emu) + emu->cpu.y;
+    u16 addr = fetch_byte(emu) + emu->cpu.y;
     emu->mem[addr] = emu->cpu.x;
     emu->cycles += 4;
   } break;
   case OPCODE_STX_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     emu->mem[addr] = emu->cpu.x;
     emu->cycles += 4;
   } break;
 
     // STY
   case OPCODE_STY_ZP: {
-    u16 addr = emu_fetch_byte(emu);
+    u16 addr = fetch_byte(emu);
     emu->mem[addr] = emu->cpu.y;
     emu->cycles += 3;
   } break;
   case OPCODE_STY_ZPX: {
-    u16 addr = emu_fetch_byte(emu) + emu->cpu.x;
+    u16 addr = fetch_byte(emu) + emu->cpu.x;
     emu->mem[addr] = emu->cpu.y;
     emu->cycles += 4;
   } break;
   case OPCODE_STY_ABS: {
-    u16 addr = emu_fetch_word(emu);
+    u16 addr = fetch_word(emu);
     emu->mem[addr] = emu->cpu.y;
     emu->cycles += 4;
   } break;
@@ -575,28 +601,28 @@ void emu_tick(Emulator *emu, bool debug_output) {
     // TAX
   case OPCODE_TAX: {
     emu->cpu.x = emu->cpu.a;
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 2;
   } break;
 
     // TAY
   case OPCODE_TAY: {
     emu->cpu.y = emu->cpu.a;
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 2;
   } break;
 
     // TSX
   case OPCODE_TSX: {
     emu->cpu.x = emu->cpu.sp;
-    emu_update_flags_x(emu);
+    update_flags_x(emu);
     emu->cycles += 2;
   } break;
 
     // TXA
   case OPCODE_TXA: {
     emu->cpu.a = emu->cpu.x;
-    emu_update_flags_a(emu);
+    update_flags_a(emu);
     emu->cycles += 2;
   } break;
 
@@ -609,7 +635,7 @@ void emu_tick(Emulator *emu, bool debug_output) {
     // TYA
   case OPCODE_TYA: {
     emu->cpu.a = emu->cpu.y;
-    emu_update_flags_y(emu);
+    update_flags_y(emu);
     emu->cycles += 2;
   } break;
 

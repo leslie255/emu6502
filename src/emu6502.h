@@ -4,8 +4,6 @@
 // 64 kB
 #define MEM_SIZE 65536
 
-u16 swap_bytes(u16 data);
-
 typedef struct CPU {
   u16 pc;    // Program Counter
   u16 sp;    // Stack Pointer
@@ -36,32 +34,27 @@ void mem_init(u8 *mem);
 void cpu_reset(CPU *cpu);
 
 // Get the status flags of the CPU as a single byte
-u8 cpu_stat_get_byte(CPU *cpu);
+u8 cpu_stat_get_byte(const CPU *cpu);
 
 // Set the status flags from a single byte, in the same format of
 // `cpu_stat_get_byte(...)`
-void cpu_set_stat_from_byte(CPU *cpu, u8 stat);
+void cpu_set_stat_from_byte(CPU *cpu, const u8 stat);
 
 // Outputs the registers and status flags of a CPU
 // Output has newline characters
-void cpu_debug_print(CPU *cpu);
+void cpu_debug_print(const CPU *cpu);
 
 // Initialize the emulator
 void emu_init(Emulator *emu);
 
-// Fetch 1 byte from memory on position of PC
-u8 emu_fetch_byte(Emulator *emu);
-// Fetch 2 bytes from memory on position of PC
-u16 emu_fetch_word(Emulator *emu);
-
 // Outputs the stack (memory address 0x0100 ~ 0x01FF)
 // Output has newline characters
-void emu_print_stack(Emulator *emu);
+void emu_print_stack(const Emulator *emu);
 
 // Read a byte of data from memory on address `addr`
-u8 emu_read_mem_byte(Emulator *emu, u16 addr);
+u8 emu_read_mem_byte(const Emulator *emu, u16 addr);
 // Read 2 bytes of data from memory on address `addr`
-u16 emu_read_mem_word(Emulator *emu, u16 addr);
+u16 emu_read_mem_word(const Emulator *emu, u16 addr);
 
 // Execute one instruction
 // `debug_output`: whether or not to output debug information for every
