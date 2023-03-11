@@ -38,10 +38,8 @@ i32 main(i32 argc, char *argv[]) {
   writer.head = 0x0800;
   mem_write_byte(&writer, OPCODE_LDA_IM);
   mem_write_byte(&writer, 0x42);
-  mem_write_byte(&writer, OPCODE_LDY_IM);
-  mem_write_byte(&writer, 0x0F);
-  mem_write_byte(&writer, OPCODE_STA_INDY);
-  mem_write_word(&writer, 0x0A00);
+  mem_write_byte(&writer, OPCODE_CMP_IM);
+  mem_write_byte(&writer, 0x42);
 
   writer.head = 0x0A00;
   mem_write_word(&writer, 0x0100);

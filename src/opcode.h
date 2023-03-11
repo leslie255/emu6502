@@ -1,3 +1,5 @@
+// reference: https://www.masswerk.at/6502/6502_instruction_set.html
+
 // IM:   Immediate
 // ZP:   Zero Page
 // ZPX:  Zero Page, X
@@ -6,14 +8,18 @@
 // ABSX: Absolute, X
 // ABSY: Absolute, Y
 // INDX: (Indirect, X)
-// INDY: Indirect, (Y)
+// INDY: (Indirect), Y
 
 #define OPCODE_BRK 0x00
 
 #define OPCODE_CMP_IM 0xC9
 #define OPCODE_CMP_ZP 0xC5
-#define OPCODE_CMP_ZPX 0xC5
-#define OPCODE_CMP_ZPY 0xC5
+#define OPCODE_CMP_ZPX 0xD5
+#define OPCODE_CMP_ABS 0xCD
+#define OPCODE_CMP_ABSX 0xDD
+#define OPCODE_CMP_ABSY 0xD9
+#define OPCODE_CMP_INDX 0xC1
+#define OPCODE_CMP_INDY 0xD1
 
 #define OPCODE_DEC_ZP 0xC6
 #define OPCODE_DEC_ZPX 0xD6

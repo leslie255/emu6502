@@ -10,13 +10,13 @@ typedef struct CPU {
   u8 a;      // Register A
   u8 x;      // Register X
   u8 y;      // Register Y
-  u8 flag_c; // Carry Flag
-  u8 flag_z; // Zero Flag
-  u8 flag_i; // Interrupt Disable
-  u8 flag_d; // Decimal Mode
-  u8 flag_b; // Break Command
-  u8 flag_v; // Overflow Flag
-  u8 flag_n; // Negative Flag
+  bool flag_c; // Carry Flag
+  bool flag_z; // Zero Flag
+  bool flag_i; // Interrupt Disable
+  bool flag_d; // Decimal Mode
+  bool flag_b; // Break Command
+  bool flag_v; // Overflow Flag
+  bool flag_n; // Negative Flag
 } CPU;
 
 typedef struct Emulator {
@@ -29,6 +29,9 @@ typedef struct Emulator {
 // Initialize the memory
 // Memory size must be `MEM_SIZE`
 void mem_init(u8 *mem);
+
+// Resets the CPU flags to all zeros
+void cpu_reset_flags(CPU *cpu);
 
 // Resets the CPU to its initial state
 void cpu_reset(CPU *cpu);
