@@ -171,7 +171,8 @@ void emu_tick(Emulator *emu, bool debug_output) {
 
     // BRK
   case OPCODE_BRK: {
-    PRINT_STAT("Force Interrupt (BRK) hasn't been properly implemented yet\n");
+    sprintf(log_buffer, "Interrupted (BRK)");
+    emu->cpu.flag_i = true;
     emu->is_running = false;
   } break;
 
