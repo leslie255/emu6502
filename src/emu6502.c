@@ -213,6 +213,27 @@ static inline void op_and(Emulator *emu, const u8 rhs) {
   set_flags_a(emu);
 }
 
+// Performs a branch operation by relative addressing mode.
+// Will fetch a byte forward.
+// Also increments cycle by 1 or 2.
+// Still requires cycle to increment by 2 outside of this function.
+// Returns target address.
+static inline u16 branch_rel(Emulator *emu) {
+  const u16 current = emu->cpu.pc - 1;
+  const u8 addr_rel = fetch_byte(emu);
+  const u16 target_addr = ((addr_rel & 0b10000000) == 0)
+                              // positive
+                              ? current + addr_rel
+                              // negative
+                              : current - (0xFF - addr_rel + 1);
+  emu->cycles++;
+  if ((emu->cpu.pc & 0xFF00) != (target_addr & 0xFF00)) {
+    emu->cycles++;
+  }
+  emu->cpu.pc = target_addr;
+  return target_addr;
+}
+
 void emu_print_stack(const Emulator *emu) {
   printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
   for (usize i = 0x0100; i <= 0x01FF; i += 16) {
@@ -364,25 +385,69 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 5;
   } break;
 
+    // BCC
+  case OPCODE_BCC_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_c == false) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BCC: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BCC: not jumped");
+    }
+  } break;
+
+    // BCS
+  case OPCODE_BCS_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_c == true) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BCS: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BCS: not jumped");
+    }
+  } break;
+
+    // BEQ
+  case OPCODE_BEQ_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_z == true) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BEQ: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BEQ: not jumped");
+    }
+  } break;
+
+    // BMI
+  case OPCODE_BMI_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_n == true) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BMI: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BMI: not jumped");
+    }
+  } break;
+
     // BNE
   case OPCODE_BNE_REL: {
     emu->cycles += 2;
     if (emu->cpu.flag_z == false) {
-      const u16 current = emu->cpu.pc - 1;
-      const u8 addr_rel = fetch_byte(emu);
-      const u16 target_addr = ((addr_rel & 0b10000000) == 0)
-                                  // positive
-                                  ? current + addr_rel
-                                  // negative
-                                  : current - (0xFF - addr_rel + 1);
-      emu->cycles++;
-      if ((emu->cpu.pc & 0xFF00) != (target_addr & 0xFF00)) {
-        emu->cycles++;
-      }
-      emu->cpu.pc = target_addr;
+      const u16 target_addr = branch_rel(emu);
       sprintf(log_buf, "BNE: 0x%04X", target_addr);
     } else {
       sprintf(log_buf, "BNE: not jumped");
+    }
+  } break;
+
+    // BPL
+  case OPCODE_BPL_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_n == false) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BPL: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BPL: not jumped");
     }
   } break;
 
@@ -392,6 +457,28 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     cpu_reset_flags(&emu->cpu);
     emu->cpu.flag_i = true;
     emu->is_running = false;
+  } break;
+
+    // BVC
+  case OPCODE_BVC_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_v == false) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BVC: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BVC: not jumped");
+    }
+  } break;
+
+    // BVS
+  case OPCODE_BVS_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_v == true) {
+      const u16 target_addr = branch_rel(emu);
+      sprintf(log_buf, "BVS: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BVS: not jumped");
+    }
   } break;
 
     // CMP

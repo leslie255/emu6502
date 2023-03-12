@@ -30,9 +30,23 @@
 #define OPCODE_AND_INDX 0x21
 #define OPCODE_AND_INDY 0x31
 
+#define OPCODE_BCC_REL 0x90
+
+#define OPCODE_BCS_REL 0xB0
+
+#define OPCODE_BEQ_REL 0xF0
+
+#define OPCODE_BMI_REL 0x30
+
 #define OPCODE_BNE_REL 0xD0
 
+#define OPCODE_BPL_REL 0x10
+
 #define OPCODE_BRK 0x00
+
+#define OPCODE_BVC_REL 0x50
+
+#define OPCODE_BVS_REL 0x70
 
 #define OPCODE_CMP_IM 0xC9
 #define OPCODE_CMP_ZP 0xC5
