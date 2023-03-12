@@ -36,6 +36,9 @@
 
 #define OPCODE_BEQ_REL 0xF0
 
+#define OPCODE_BIT_ZP 0x24
+#define OPCODE_BIT_ABS 0x2C
+
 #define OPCODE_BMI_REL 0x30
 
 #define OPCODE_BNE_REL 0xD0

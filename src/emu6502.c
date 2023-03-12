@@ -214,9 +214,14 @@ static inline void op_and(Emulator *emu, const u8 rhs) {
   emu->cpu.a &= rhs;
   set_flags_a(emu);
 }
+
 static inline void op_bit(Emulator *emu, const u8 x) {
-  emu->cpu.flag_v = (x & 0b00000001) == 0 ? 0 : 1;
-  emu->cpu.flag_v = (x & 0b00000001) == 0 ? 0 : 1;
+  cpu_reset_flags(&emu->cpu);
+  emu->cpu.flag_n = (x & 0b10000000) >> 7;
+  emu->cpu.flag_v = (x & 0b01000000) >> 6;
+  if ((x & emu->cpu.a) == 0) {
+    emu->cpu.flag_z = true;
+  }
 }
 
 // Performs a branch operation by relative addressing mode.
@@ -422,6 +427,20 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     } else {
       sprintf(log_buf, "BEQ: not jumped");
     }
+  } break;
+
+    // BIT
+  case OPCODE_BIT_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    op_bit(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+
+    // BIT
+  case OPCODE_BIT_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    op_bit(emu, emu->mem[addr]);
+    emu->cycles += 4;
   } break;
 
     // BMI
