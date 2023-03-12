@@ -220,6 +220,11 @@ static inline void op_ora(Emulator *emu, const u8 rhs) {
   set_flags_a(emu);
 }
 
+static inline void op_eor(Emulator *emu, const u8 rhs) {
+  emu->cpu.a ^= rhs;
+  set_flags_a(emu);
+}
+
 static inline void op_bit(Emulator *emu, const u8 x) {
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_n = (x & 0b10000000) >> 7;
@@ -738,6 +743,57 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cpu.y++;
     set_flags_y(emu);
     emu->cycles += 2;
+  } break;
+
+    // EOR
+  case OPCODE_EOR_IM: {
+    const u8 rhs = fetch_byte(emu);
+    op_eor(emu, rhs);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_EOR_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    op_eor(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_EOR_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    op_eor(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_EOR_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    op_eor(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_EOR_ABSX: {
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_eor(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_EOR_ABSY: {
+    const __auto_type result = fetch_addr_absy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_eor(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_EOR_INDX: {
+    const u16 addr = fetch_addr_indx(emu);
+    op_eor(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_EOR_INDY: {
+    const __auto_type result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_eor(emu, emu->mem[result.addr]);
+    emu->cycles += 5;
   } break;
 
     // JMP
