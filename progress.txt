@@ -4,9 +4,9 @@
 
 ADC (x)   JSR (x)
 AND (x)   LDA (x)
-ASL (x)   LDX (x)
+ASL (-)   LDX (x)
 BCC (x)   LDY (x)
-BCS (x)   LSR (x)
+BCS (x)   LSR ( )
 BEQ (x)   NOP (x)
 BIT (x)   ORA (x)
 BMI (x)   PHA (x)
