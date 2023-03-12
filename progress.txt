@@ -1,5 +1,9 @@
+(x): Fully implemented, including all addressing modes
+(-): Only partially implemented
+( ): Unimplented
+
 ADC (x)   JSR (x)
-AND ( )   LDA (x)
+AND (x)   LDA (x)
 ASL ( )   LDX (x)
 BCC ( )   LDY (x)
 BCS ( )   LSR (x)

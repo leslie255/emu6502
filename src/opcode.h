@@ -12,14 +12,23 @@
 // Rel:  Relative
 // :     Implied
 
-#define OPCODE_ADC_IM   0x69
-#define OPCODE_ADC_ZP   0x65
-#define OPCODE_ADC_ZPX  0x75
-#define OPCODE_ADC_ABS  0x6D
+#define OPCODE_ADC_IM 0x69
+#define OPCODE_ADC_ZP 0x65
+#define OPCODE_ADC_ZPX 0x75
+#define OPCODE_ADC_ABS 0x6D
 #define OPCODE_ADC_ABSX 0x7D
 #define OPCODE_ADC_ABSY 0x79
 #define OPCODE_ADC_INDX 0x61
 #define OPCODE_ADC_INDY 0x71
+
+#define OPCODE_AND_IM 0x29
+#define OPCODE_AND_ZP 0x25
+#define OPCODE_AND_ZPX 0x35
+#define OPCODE_AND_ABS 0x2D
+#define OPCODE_AND_ABSX 0x3D
+#define OPCODE_AND_ABSY 0x39
+#define OPCODE_AND_INDX 0x21
+#define OPCODE_AND_INDY 0x31
 
 #define OPCODE_BNE_REL 0xD0
 
