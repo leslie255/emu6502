@@ -118,7 +118,7 @@ static inline u16 fetch_addr_zpy(Emulator *emu) {
 // get an address on the position of PC by addressing mode Absolute
 static inline u16 fetch_addr_abs(Emulator *emu) { return fetch_word(emu); }
 
-// get an address on the position of PC by Absolute,X addressing mode
+// get an address on the position of PC by addressing mode Absolute,X
 static inline struct addr_fetch_result fetch_addr_absx(Emulator *emu) {
   const u16 addr0 = fetch_word(emu);
   const u16 addr1 = addr0 + emu->cpu.x;
@@ -126,7 +126,7 @@ static inline struct addr_fetch_result fetch_addr_absx(Emulator *emu) {
   return (struct addr_fetch_result){addr1, page_crossed};
 }
 
-// get an address on the position of PC by Absolute,Y addressing mode
+// get an address on the position of PC by addressing mode Absolute,Y
 static inline struct addr_fetch_result fetch_addr_absy(Emulator *emu) {
   const u16 addr0 = fetch_word(emu);
   const u16 addr1 = addr0 + emu->cpu.y;
@@ -134,14 +134,14 @@ static inline struct addr_fetch_result fetch_addr_absy(Emulator *emu) {
   return (struct addr_fetch_result){addr1, page_crossed};
 }
 
-// get an address on the position of PC by addressing mode (Indirect, X)
+// get an address on the position of PC by addressing mode (Indirect,X)
 static inline u16 fetch_addr_indx(Emulator *emu) {
   const u16 addr0 = fetch_word(emu) + emu->cpu.x;
   const u16 addr1 = emu_read_mem_word(emu, addr0);
   return addr1;
 }
 
-// get an address on the position of PC by addressing mode (Indirect, Y)
+// get an address on the position of PC by addressing mode (Indirect),Y
 static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
   const u16 addr0 = fetch_word(emu);
   const u16 addr1 = emu_read_mem_word(emu, addr0) + emu->cpu.y;
