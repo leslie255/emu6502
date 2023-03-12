@@ -1,4 +1,4 @@
-ADC ( )   JSR (x)
+ADC (x)   JSR (x)
 AND ( )   LDA (x)
 ASL ( )   LDX (x)
 BCC ( )   LDY (x)

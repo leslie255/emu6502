@@ -187,6 +187,25 @@ static inline void cmp_y(Emulator *emu, const u8 rhs) {
   cmp(emu, emu->cpu.y, rhs);
 }
 
+struct carrying_add_result_u8 {
+  u8 sum;
+  bool carry;
+};
+
+static inline struct carrying_add_result_u8
+carrying_add_u8(const u8 lhs, const u8 rhs, const bool carry) {
+  const u8 sum = lhs + rhs + carry;
+  const bool carry_out = (sum < lhs || sum < rhs || sum < carry);
+  return (struct carrying_add_result_u8){sum, carry_out};
+}
+
+static inline void adc(Emulator *emu, const u8 rhs) {
+  const __auto_type sum_carry =
+      carrying_add_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
+  emu->cpu.flag_c = sum_carry.carry;
+  emu->cpu.a = sum_carry.sum;
+}
+
 void emu_print_stack(const Emulator *emu) {
   printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
   for (usize i = 0x0100; i <= 0x01FF; i += 16) {
@@ -236,6 +255,56 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   const u8 opcode = fetch_byte(emu);
 
   switch (opcode) {
+  // ADC
+  case OPCODE_ADC_IM: {
+    const u8 rhs = fetch_byte(emu);
+    adc(emu, rhs);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_ADC_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    adc(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_ADC_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    adc(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ADC_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    adc(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ADC_ABSX: {
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    adc(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ADC_ABSY: {
+    const __auto_type result = fetch_addr_absy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    adc(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ADC_INDX: {
+    const u16 addr = fetch_addr_indx(emu);
+    adc(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ADC_INDY: {
+    const __auto_type result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    adc(emu, emu->mem[result.addr]);
+    emu->cycles += 5;
+  } break;
 
     // BRK
   case OPCODE_BRK: {
@@ -467,19 +536,19 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   } break;
   case OPCODE_LDA_ZP: {
     const u16 addr = fetch_addr_zp(emu);
-    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu->cpu.a = emu->mem[addr];
     set_flags_a(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDA_ZPX: {
     const u16 addr = fetch_addr_zpx(emu);
-    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu->cpu.a = emu->mem[addr];
     set_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABS: {
     u16 addr = fetch_word(emu);
-    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu->cpu.a = emu->mem[addr];
     set_flags_a(emu);
     emu->cycles += 4;
   } break;
@@ -488,7 +557,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.a = emu_read_mem_byte(emu, result.addr);
+    emu->cpu.a = emu->mem[result.addr];
     set_flags_a(emu);
     emu->cycles += 4;
   } break;
@@ -497,13 +566,13 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.a = emu_read_mem_byte(emu, result.addr);
+    emu->cpu.a = emu->mem[result.addr];
     set_flags_a(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_INDX: {
     const u16 addr = fetch_addr_indx(emu);
-    emu->cpu.a = emu_read_mem_byte(emu, addr);
+    emu->cpu.a = emu->mem[addr];
     set_flags_a(emu);
     emu->cycles += 6;
   } break;
@@ -512,7 +581,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.a = emu_read_mem_byte(emu, result.addr);
+    emu->cpu.a = emu->mem[result.addr];
     set_flags_a(emu);
     emu->cycles += 5;
   } break;
@@ -526,19 +595,19 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   } break;
   case OPCODE_LDX_ZP: {
     const u16 addr = fetch_addr_zp(emu);
-    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu->cpu.x = emu->mem[addr];
     set_flags_x(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDX_ZPY: {
     const u16 addr = fetch_addr_zpy(emu);
-    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu->cpu.x = emu->mem[addr];
     set_flags_x(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDX_ABS: {
     u16 addr = fetch_word(emu);
-    emu->cpu.x = emu_read_mem_byte(emu, addr);
+    emu->cpu.x = emu->mem[addr];
     set_flags_x(emu);
     emu->cycles += 4;
   } break;
@@ -547,7 +616,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.x = emu_read_mem_byte(emu, result.addr);
+    emu->cpu.x = emu->mem[result.addr];
     set_flags_x(emu);
     emu->cycles += 4;
   } break;
@@ -561,19 +630,19 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   } break;
   case OPCODE_LDY_ZP: {
     const u16 addr = fetch_addr_zp(emu);
-    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu->cpu.y = emu->mem[addr];
     set_flags_y(emu);
     emu->cycles += 3;
   } break;
   case OPCODE_LDY_ZPY: {
     const u16 addr = fetch_addr_zpy(emu);
-    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu->cpu.y = emu->mem[addr];
     set_flags_y(emu);
     emu->cycles += 4;
   } break;
   case OPCODE_LDY_ABS: {
     u16 addr = fetch_word(emu);
-    emu->cpu.y = emu_read_mem_byte(emu, addr);
+    emu->cpu.y = emu->mem[addr];
     set_flags_y(emu);
     emu->cycles += 4;
   } break;
@@ -582,7 +651,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     if (result.page_crossed) {
       emu->cycles++;
     }
-    emu->cpu.y = emu_read_mem_byte(emu, result.addr);
+    emu->cpu.y = emu->mem[result.addr];
     set_flags_y(emu);
     emu->cycles += 4;
   } break;
@@ -611,7 +680,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // PLA
   case OPCODE_PLA: {
-    emu->cpu.a = emu_read_mem_byte(emu, emu->cpu.sp);
+    emu->cpu.a = emu->mem[emu->cpu.sp];
     emu->cpu.sp--;
     emu->cycles += 4;
     if (emu->cpu.sp < 0x100) {
@@ -622,7 +691,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // PLP
   case OPCODE_PLP: {
-    u8 stat = emu_read_mem_byte(emu, emu->cpu.sp);
+    u8 stat = emu->mem[emu->cpu.sp];
     cpu_set_stat_from_byte(&emu->cpu, stat);
     emu->cpu.sp--;
     emu->cycles += 4;

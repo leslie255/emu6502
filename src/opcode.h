@@ -10,6 +10,15 @@
 // INDX: (Indirect, X)
 // INDY: (Indirect), Y
 
+#define OPCODE_ADC_IM   0x69
+#define OPCODE_ADC_ZP   0x65
+#define OPCODE_ADC_ZPX  0x75
+#define OPCODE_ADC_ABS  0x6D
+#define OPCODE_ADC_ABSX 0x7D
+#define OPCODE_ADC_ABSY 0x79
+#define OPCODE_ADC_INDX 0x61
+#define OPCODE_ADC_INDY 0x71
+
 #define OPCODE_BRK 0x00
 
 #define OPCODE_CMP_IM 0xC9
