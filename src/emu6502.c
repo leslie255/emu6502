@@ -24,26 +24,28 @@ void cpu_reset(CPU *cpu) {
 
 u8 cpu_stat_get_byte(const CPU *cpu) {
   u8 stat = 0;
-  stat |= cpu->flag_c << 6;
-  stat |= cpu->flag_z << 5;
-  stat |= cpu->flag_i << 4;
+  stat |= cpu->flag_n << 7;
+  stat |= cpu->flag_v << 6;
+  //-------------------- 5;
+  stat |= cpu->flag_b << 4;
   stat |= cpu->flag_d << 3;
-  stat |= cpu->flag_b << 2;
-  stat |= cpu->flag_v << 1;
-  stat |= cpu->flag_n;
+  stat |= cpu->flag_i << 2;
+  stat |= cpu->flag_z << 1;
+  stat |= cpu->flag_c << 0;
 
   return stat;
 }
 
 void cpu_set_stat_from_byte(CPU *cpu, const u8 stat) {
   cpu_reset_flags(cpu);
-  cpu->flag_c = (stat & 0x01000000) >> 6;
-  cpu->flag_z = (stat & 0x00100000) >> 5;
-  cpu->flag_i = (stat & 0x00010000) >> 4;
-  cpu->flag_d = (stat & 0x00001000) >> 3;
-  cpu->flag_b = (stat & 0x00000100) >> 2;
-  cpu->flag_v = (stat & 0x00000010) >> 1;
-  cpu->flag_n = stat & 0x00000001;
+  cpu->flag_n = (stat & 0b10000000) >> 7;
+  cpu->flag_v = (stat & 0b01000000) >> 6;
+  //---------------------------------- 5;
+  cpu->flag_b = (stat & 0b00010000) >> 4;
+  cpu->flag_d = (stat & 0b00001000) >> 3;
+  cpu->flag_i = (stat & 0b00000100) >> 2;
+  cpu->flag_z = (stat & 0b00000010) >> 1;
+  cpu->flag_c = (stat & 0b00000001) >> 0;
 }
 
 static inline char zero_or_one(const u8 x) { return (x == 0) ? '0' : '1'; }
@@ -211,6 +213,10 @@ static inline void op_adc(Emulator *emu, const u8 rhs) {
 static inline void op_and(Emulator *emu, const u8 rhs) {
   emu->cpu.a &= rhs;
   set_flags_a(emu);
+}
+static inline void op_bit(Emulator *emu, const u8 x) {
+  emu->cpu.flag_v = (x & 0b00000001) == 0 ? 0 : 1;
+  emu->cpu.flag_v = (x & 0b00000001) == 0 ? 0 : 1;
 }
 
 // Performs a branch operation by relative addressing mode.
@@ -883,13 +889,13 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // PLP
   case OPCODE_PLP: {
     u8 stat = emu->mem[emu->cpu.sp];
-    cpu_set_stat_from_byte(&emu->cpu, stat);
     emu->cpu.sp--;
     emu->cycles += 4;
     if (emu->cpu.sp < 0x100) {
       sprintf(log_buf, "Stack underflowed");
       emu->is_running = false;
     }
+    cpu_set_stat_from_byte(&emu->cpu, stat);
   } break;
 
     // SEC
