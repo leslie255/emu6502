@@ -21,6 +21,14 @@
 #define OPCODE_CMP_INDX 0xC1
 #define OPCODE_CMP_INDY 0xD1
 
+#define OPCODE_CPX_IM 0xE0
+#define OPCODE_CPX_ZP 0xE4
+#define OPCODE_CPX_ABS 0xEC
+
+#define OPCODE_CPY_IM 0xC0
+#define OPCODE_CPY_ZP 0xC4
+#define OPCODE_CPY_ABS 0xCC
+
 #define OPCODE_DEC_ZP 0xC6
 #define OPCODE_DEC_ZPX 0xD6
 #define OPCODE_DEC_ABS 0xCE

@@ -179,13 +179,13 @@ static inline void cmp_a(Emulator *emu, const u8 rhs) {
   cmp(emu, emu->cpu.a, rhs);
 }
 
-// static inline void cmp_x(Emulator *emu, const u8 rhs) {
-//   cmp(emu, emu->cpu.x, rhs);
-// }
-//
-// static inline void cmp_y(Emulator *emu, const u8 rhs) {
-//   cmp(emu, emu->cpu.y, rhs);
-// }
+static inline void cmp_x(Emulator *emu, const u8 rhs) {
+  cmp(emu, emu->cpu.x, rhs);
+}
+
+static inline void cmp_y(Emulator *emu, const u8 rhs) {
+  cmp(emu, emu->cpu.y, rhs);
+}
 
 void emu_print_stack(const Emulator *emu) {
   printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
@@ -294,6 +294,40 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     }
     cmp_a(emu, emu->mem[result.addr]);
     emu->cycles += 5;
+  } break;
+
+    // CPX
+  case OPCODE_CPX_IM: {
+    const u8 byte = fetch_byte(emu);
+    cmp_x(emu, byte);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_CPX_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    cmp_x(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_CPX_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    cmp_x(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+
+    // CPY
+  case OPCODE_CPY_IM: {
+    const u8 byte = fetch_byte(emu);
+    cmp_y(emu, byte);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_CPY_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    cmp_y(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_CPY_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    cmp_y(emu, emu->mem[addr]);
+    emu->cycles += 4;
   } break;
 
     // DEC
