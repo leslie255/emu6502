@@ -12,7 +12,9 @@ There is a `MemWriter` struct and it's associated functions in `main.c` to write
 $ make all && ./bin/emu6502
 ```
 
-An assembler is also going to be added
+The emulator outputs a debug interface which traces the CPU and stack step by step, which can slow down the performance significantly. To disable that, add `--less-io` option to only output a `{x} cycles` prompt every 8 million ticks.
+
+An assembler is also going to be added.
 
 ## LICENSE
 

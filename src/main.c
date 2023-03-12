@@ -46,23 +46,47 @@ i32 main(i32 argc, char *argv[]) {
   writer.head = 0x0A00;
   mem_write_word(&writer, 0x0100);
 
-  initscr();
-  noecho();
-  while (true) {
-    clear();
-    emu_tick(&emu, true);
-    refresh();
-    if (emu.is_running) {
-      printw("\nPress n to tick forward 1 instruction\n");
-      while (getch() != 'n')
-        ;
+  bool less_io = false;
+
+  for (i32 i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--less-io") == 0) {
+      less_io = true;
     } else {
-      printw("\nEmulation halted, press q to quit\n");
-      while (getch() != 'q')
-        ;
-      break;
+      printf("invalid argument: %s", argv[i]);
     }
   }
-  endwin();
+
+  printf("initialized\n");
+
+  if (less_io) {
+    while (true) {
+      if (emu.is_running) {
+        if (emu.cycles % 8000000 == 0) {
+          printf("%llu cycles\n", emu.cycles);
+        }
+        emu_tick(&emu, false);
+      }
+    }
+  } else {
+    initscr();
+    noecho();
+    while (true) {
+      clear();
+      emu_tick(&emu, true);
+      refresh();
+      if (emu.is_running) {
+        printw("\nPress n to tick forward 1 instruction\n");
+        while (getch() != 'n')
+          ;
+      } else {
+        printw("\nEmulation halted, press q to quit\n");
+        while (getch() != 'q')
+          ;
+        break;
+      }
+    }
+    endwin();
+  }
+
   return 0;
 }
