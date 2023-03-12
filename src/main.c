@@ -39,7 +39,9 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_byte(&writer, OPCODE_LDA_IM);
   mem_write_byte(&writer, 0x42);
   mem_write_byte(&writer, OPCODE_CMP_IM);
-  mem_write_byte(&writer, 0x42);
+  mem_write_byte(&writer, 0x43);
+  mem_write_byte(&writer, OPCODE_BNE_REL);
+  mem_write_byte(&writer, 0b11111100);
 
   writer.head = 0x0A00;
   mem_write_word(&writer, 0x0100);

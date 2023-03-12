@@ -9,6 +9,8 @@
 // ABSY: Absolute, Y
 // INDX: (Indirect, X)
 // INDY: (Indirect), Y
+// Rel:  Relative
+// :     Implied
 
 #define OPCODE_ADC_IM   0x69
 #define OPCODE_ADC_ZP   0x65
@@ -18,6 +20,8 @@
 #define OPCODE_ADC_ABSY 0x79
 #define OPCODE_ADC_INDX 0x61
 #define OPCODE_ADC_INDY 0x71
+
+#define OPCODE_BNE_REL 0xD0
 
 #define OPCODE_BRK 0x00
 

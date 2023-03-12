@@ -154,7 +154,7 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
 static inline void set_flags(Emulator *emu, const u8 byte) {
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_z = (byte == 0);
-  emu->cpu.flag_n = (i8)byte > 0;
+  emu->cpu.flag_n = (i8)byte < 0;
 }
 
 // update flags in the CPU according to register A
@@ -167,7 +167,7 @@ static inline void set_flags_x(Emulator *emu) { set_flags(emu, emu->cpu.x); }
 static inline void set_flags_y(Emulator *emu) { set_flags(emu, emu->cpu.y); }
 
 static inline void cmp(Emulator *emu, const u8 lhs, const u8 rhs) {
-  sprintf(log_buf, "cmp: %02X vs %02X", lhs, rhs);
+  sprintf(log_buf, "cmp: 0x%02X vs 0x%02X", lhs, rhs);
   const u8 sub_result = (lhs - rhs);
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_z = (lhs == rhs);
@@ -304,6 +304,28 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     }
     adc(emu, emu->mem[result.addr]);
     emu->cycles += 5;
+  } break;
+
+    // BNE
+  case OPCODE_BNE_REL: {
+    emu->cycles += 2;
+    if (emu->cpu.flag_z == false) {
+      const u16 current = emu->cpu.pc - 1;
+      const u8 addr_rel = fetch_byte(emu);
+      const u16 target_addr = ((addr_rel & 0b10000000) == 0)
+                                  // positive
+                                  ? current + addr_rel
+                                  // negative
+                                  : current - (0xFF - addr_rel + 1);
+      emu->cycles++;
+      if ((emu->cpu.pc & 0xFF00) != (target_addr & 0xFF00)) {
+        emu->cycles++;
+      }
+      emu->cpu.pc = target_addr;
+      sprintf(log_buf, "BNE: 0x%04X", target_addr);
+    } else {
+      sprintf(log_buf, "BNE: not jumped");
+    }
   } break;
 
     // BRK
