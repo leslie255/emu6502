@@ -4,11 +4,11 @@
 
 ADC (x)   JSR (x)
 AND (x)   LDA (x)
-ASL ( )   LDX (x)
+ASL (x)   LDX (x)
 BCC (x)   LDY (x)
 BCS (x)   LSR (x)
 BEQ (x)   NOP (x)
-BIT (x)   ORA ( )
+BIT (x)   ORA (x)
 BMI (x)   PHA (x)
 BNE (x)   PHP (x)
 BPL (x)   PLA (x)

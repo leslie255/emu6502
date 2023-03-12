@@ -1,5 +1,6 @@
 // reference: https://www.masswerk.at/6502/6502_instruction_set.html
 
+// A:    Accumulator
 // IM:   Immediate
 // ZP:   Zero Page
 // ZPX:  Zero Page, X
@@ -29,6 +30,12 @@
 #define OPCODE_AND_ABSY 0x39
 #define OPCODE_AND_INDX 0x21
 #define OPCODE_AND_INDY 0x31
+
+#define OPCODE_ASL_A 0x0A
+#define OPCODE_ASL_ZP 0x06
+#define OPCODE_ASL_ZPX 0x16
+#define OPCODE_ASL_ABS 0x0E
+#define OPCODE_ASL_ABSX 0x1E
 
 #define OPCODE_BCC_REL 0x90
 
@@ -97,6 +104,15 @@
 #define OPCODE_JSR_ABS 0x20
 
 #define OPCODE_NOP 0xEA
+
+#define OPCODE_ORA_IM 0x09
+#define OPCODE_ORA_ZP 0x05
+#define OPCODE_ORA_ZPX 0x15
+#define OPCODE_ORA_ABS 0x0D
+#define OPCODE_ORA_ABSX 0x1D
+#define OPCODE_ORA_ABSY 0x19
+#define OPCODE_ORA_INDX 0x01
+#define OPCODE_ORA_INDY 0x11
 
 #define OPCODE_LDA_IM 0xA9
 #define OPCODE_LDA_ZP 0xA5

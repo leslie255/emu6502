@@ -215,6 +215,11 @@ static inline void op_and(Emulator *emu, const u8 rhs) {
   set_flags_a(emu);
 }
 
+static inline void op_ora(Emulator *emu, const u8 rhs) {
+  emu->cpu.a |= rhs;
+  set_flags_a(emu);
+}
+
 static inline void op_bit(Emulator *emu, const u8 x) {
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_n = (x & 0b10000000) >> 7;
@@ -394,6 +399,32 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     }
     op_and(emu, emu->mem[result.addr]);
     emu->cycles += 5;
+  } break;
+
+    // ASL
+  case OPCODE_ASL_A: {
+    emu->cpu.a <<= 1;
+    emu->cycles += 2;
+  } break;
+  case OPCODE_ASL_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    emu->mem[addr] <<= 1;
+    emu->cycles += 5;
+  } break;
+  case OPCODE_ASL_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    emu->mem[addr] <<= 1;
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ASL_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    emu->mem[addr] <<= 1;
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ASL_ABSX: {
+    const u16 addr = fetch_addr_absx(emu).addr;
+    emu->mem[addr] <<= 1;
+    emu->cycles += 7;
   } break;
 
     // BCC
@@ -741,6 +772,58 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // NOP
   case OPCODE_NOP: {
+    emu->cycles += 2;
+  } break;
+
+    // ORA
+  case OPCODE_ORA_IM: {
+    const u8 rhs = fetch_byte(emu);
+    op_ora(emu, rhs);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_ORA_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    op_ora(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_ORA_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    op_ora(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ORA_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    op_ora(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ORA_ABSX: {
+    const __auto_type result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_ora(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ORA_ABSY: {
+    const __auto_type result = fetch_addr_absy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_ora(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_ORA_INDX: {
+    const u16 addr = fetch_addr_indx(emu);
+    op_ora(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ORA_INDY: {
+    const __auto_type result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_ora(emu, emu->mem[result.addr]);
+    emu->cycles += 5;
   } break;
 
     // LDA
