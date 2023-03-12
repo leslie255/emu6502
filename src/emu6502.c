@@ -481,6 +481,30 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     }
   } break;
 
+    // CLC
+  case OPCODE_CLC: {
+    emu->cpu.flag_c = false;
+    emu->cycles += 2;
+  } break;
+
+    // CLD
+  case OPCODE_CLD: {
+    emu->cpu.flag_d = false;
+    emu->cycles += 2;
+  } break;
+
+    // CLI
+  case OPCODE_CLI: {
+    emu->cpu.flag_i = false;
+    emu->cycles += 2;
+  } break;
+
+    // CLV
+  case OPCODE_CLV: {
+    emu->cpu.flag_v = false;
+    emu->cycles += 2;
+  } break;
+
     // CMP
   case OPCODE_CMP_IM: {
     const u8 byte = fetch_byte(emu);

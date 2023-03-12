@@ -48,6 +48,11 @@
 
 #define OPCODE_BVS_REL 0x70
 
+#define OPCODE_CLC 0x18
+#define OPCODE_CLD 0xD8
+#define OPCODE_CLI 0x58
+#define OPCODE_CLV 0xB8
+
 #define OPCODE_CMP_IM 0xC9
 #define OPCODE_CMP_ZP 0xC5
 #define OPCODE_CMP_ZPX 0xD5
