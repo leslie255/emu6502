@@ -701,6 +701,24 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     }
   } break;
 
+    // SEC
+  case OPCODE_SEC: {
+    emu->cpu.flag_c = true;
+    emu->cycles += 2;
+  } break;
+
+    // SED
+  case OPCODE_SED: {
+    emu->cpu.flag_d = true;
+    emu->cycles += 2;
+  } break;
+
+    // SEI
+  case OPCODE_SEI: {
+    emu->cpu.flag_i = true;
+    emu->cycles += 2;
+  } break;
+
     // STA
   case OPCODE_STA_ZP: {
     const u16 addr = fetch_addr_zp(emu);

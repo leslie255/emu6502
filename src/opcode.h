@@ -92,6 +92,12 @@
 
 #define OPCODE_PLP 0x28
 
+#define OPCODE_SEC 0x38
+
+#define OPCODE_SED 0xF8
+
+#define OPCODE_SEI 0x78
+
 #define OPCODE_STA_ZP 0x85
 #define OPCODE_STA_ZPX 0x95
 #define OPCODE_STA_ABS 0x8D
