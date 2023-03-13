@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall --std=gnu2x -lncurses  -O2
+CFLAGS = -Wall --std=gnu2x -lncurses -O2
 
 all: bin/main.o bin/emu6502.o bin/emu6502
 

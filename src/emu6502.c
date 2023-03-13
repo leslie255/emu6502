@@ -1,8 +1,19 @@
 #include "emu6502.h"
 
 #include <ncurses.h>
+#include <stdarg.h>
 
-static char log_buf[1024] = {0};
+#define LOG_BUF_SIZE 1024
+
+static bool debug_output_enabled;
+static char log_buf[LOG_BUF_SIZE] = {0};
+
+#define LPRINTF(...)                                                           \
+  if (debug_output_enabled) {                                                  \
+    const usize i = strlen(log_buf);                                           \
+    char *buff = &log_buf[i];                                                  \
+    sprintf(buff, __VA_ARGS__);                                                \
+  }
 
 void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
@@ -76,13 +87,13 @@ void emu_init(Emulator *emu) {
 
 // Halt the emulator with a stack overflow message
 static inline void stack_overflow(Emulator *emu) {
-  sprintf(log_buf, "Stack overflowed");
+  LPRINTF("Stack overflowed");
   emu->is_running = false;
 }
 
 // Halt the emulator with a stack underflow message
 static inline void stack_underflow(Emulator *emu) {
-  sprintf(log_buf, "Stack underflowed");
+  LPRINTF("Stack underflowed");
   emu->is_running = false;
 }
 
@@ -182,7 +193,7 @@ static inline void set_flags_x(Emulator *emu) { set_flags(emu, emu->cpu.x); }
 static inline void set_flags_y(Emulator *emu) { set_flags(emu, emu->cpu.y); }
 
 static inline void cmp(Emulator *emu, const u8 lhs, const u8 rhs) {
-  sprintf(log_buf, "cmp: 0x%02X vs 0x%02X", lhs, rhs);
+  LPRINTF("cmp: 0x%02X vs 0x%02X", lhs, rhs);
   const u8 sub_result = (lhs - rhs);
   set_flags(emu, sub_result);
   emu->cpu.flag_c = (lhs >= rhs);
@@ -300,13 +311,13 @@ static inline void stack_push(Emulator *emu) {
   emu->mem[emu->cpu.sp] = pc & 0x00FF;
   emu->cpu.sp++;
   emu->mem[emu->cpu.sp] = pc >> 8;
-  sprintf(log_buf, "PC pushed: %04X", pc);
+  LPRINTF("PC pushed: %04X", pc);
 }
 
 // Pull the value of SR and PC from the stack.
 // Used for function return
 static inline void stack_pull(Emulator *emu) {
-  if (emu->cpu.sp < STACK_FLOOR + 3) {
+  if (emu->cpu.sp < STACK_FLOOR + 2) {
     stack_underflow(emu);
   }
   u16 pc = *(u16 *)&emu->mem[emu->cpu.sp - 1];
@@ -315,7 +326,7 @@ static inline void stack_pull(Emulator *emu) {
   }
   emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
   emu->cpu.sp--;
-  sprintf(log_buf, "PC pulled: %04X", pc);
+  LPRINTF("PC pulled: %04X", pc);
   emu->cpu.pc = pc;
 }
 
@@ -349,6 +360,7 @@ u16 emu_read_mem_word(const Emulator *emu, const u16 addr) {
 }
 
 void emu_tick(Emulator *emu, const bool debug_output) {
+  debug_output_enabled = debug_output;
 
 #define PRINT_STAT(...)                                                        \
   if (debug_output) {                                                          \
@@ -501,9 +513,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_c == false) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BCC: 0x%04X", target_addr);
+      LPRINTF("BCC: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BCC: not jumped");
+      LPRINTF("BCC: not jumped");
     }
   } break;
 
@@ -512,9 +524,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_c == true) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BCS: 0x%04X", target_addr);
+      LPRINTF("BCC: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BCS: not jumped");
+      LPRINTF("BCS: not jumped");
     }
   } break;
 
@@ -523,9 +535,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_z == true) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BEQ: 0x%04X", target_addr);
+      LPRINTF("BEQ: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BEQ: not jumped");
+      LPRINTF("BEQ: not jumped");
     }
   } break;
 
@@ -548,9 +560,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_n == true) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BMI: 0x%04X", target_addr);
+      LPRINTF("BMI: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BMI: not jumped");
+      LPRINTF("BMI: not jumped");
     }
   } break;
 
@@ -559,9 +571,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_z == false) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BNE: 0x%04X", target_addr);
+      LPRINTF("BNE: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BNE: not jumped");
+      LPRINTF("BNE: not jumped");
     }
   } break;
 
@@ -570,15 +582,15 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_n == false) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BPL: 0x%04X", target_addr);
+      LPRINTF("BPL: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BPL: not jumped");
+      LPRINTF("BPL: not jumped");
     }
   } break;
 
     // BRK
   case OPCODE_BRK: {
-    sprintf(log_buf, "Interrupted (BRK)");
+    LPRINTF("Interrupted (BRK)");
     cpu_reset_flags(&emu->cpu);
     stack_push(emu);
     emu->cpu.flag_i = true;
@@ -590,9 +602,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_v == false) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BVC: 0x%04X", target_addr);
+      LPRINTF("BVC: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BVC: not jumped");
+      LPRINTF("BVC: not jumped");
     }
   } break;
 
@@ -601,9 +613,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.flag_v == true) {
       const u16 target_addr = branch_rel(emu);
-      sprintf(log_buf, "BVS: 0x%04X", target_addr);
+      LPRINTF("BVS: 0x%04X", target_addr);
     } else {
-      sprintf(log_buf, "BVS: not jumped");
+      LPRINTF("BVS: not jumped");
     }
   } break;
 
@@ -864,14 +876,14 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // JMP
   case OPCODE_JMP_ABS: {
     u16 addr = fetch_word(emu);
-    sprintf(log_buf, "JMP_ABS: 0x%04x", addr);
+    LPRINTF("JMP_ABS: 0x%04x", addr);
     emu->cpu.pc = addr;
     emu->cycles += 3;
   } break;
   case OPCODE_JMP_IND: {
     u16 addr0 = fetch_word(emu);
     u16 addr = emu_read_mem_word(emu, addr0);
-    sprintf(log_buf, "JMP_IND: 0x%04x", addr);
+    LPRINTF("JMP_IND: 0x%04x", addr);
     emu->cpu.pc = addr;
     emu->cycles += 5;
   } break;
@@ -880,7 +892,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_JSR_ABS: {
     const u16 jmp_addr = fetch_word(emu);
     stack_push(emu);
-    // sprintf(log_buf, "JSR_ABS: 0x%04x", jmp_addr);
+    // LPRINTF( "JSR_ABS: 0x%04x", jmp_addr);
     emu->cpu.pc = jmp_addr;
     emu->cycles += 6;
   } break;
@@ -1121,7 +1133,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cpu.a = emu->mem[emu->cpu.sp];
     emu->cpu.sp--;
     emu->cycles += 4;
-    if (emu->cpu.sp < STACK_FLOOR) {
+    if (emu->cpu.sp < STACK_FLOOR - 1) {
       stack_underflow(emu);
     }
   } break;
@@ -1132,7 +1144,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cpu.sp--;
     emu->cycles += 4;
     if (emu->cpu.sp < 0x100) {
-      sprintf(log_buf, "Stack underflowed");
+      LPRINTF("Stack underflowed");
       emu->is_running = false;
     }
     cpu_set_stat_from_byte(&emu->cpu, stat);
