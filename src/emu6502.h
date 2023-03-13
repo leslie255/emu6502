@@ -4,6 +4,9 @@
 // 64 kB
 #define MEM_SIZE 65536
 
+#define STACK_FLOOR 0x0100
+#define STACK_LIMIT 0x01FF
+
 typedef struct CPU {
   u16 pc;    // Program Counter
   u16 sp;    // Stack Pointer

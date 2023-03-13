@@ -74,6 +74,18 @@ void emu_init(Emulator *emu) {
   emu->is_running = true;
 }
 
+// Halt the emulator with a stack overflow message
+static inline void stack_overflow(Emulator *emu) {
+  sprintf(log_buf, "Stack overflowed");
+  emu->is_running = false;
+}
+
+// Halt the emulator with a stack underflow message
+static inline void stack_underflow(Emulator *emu) {
+  sprintf(log_buf, "Stack underflowed");
+  emu->is_running = false;
+}
+
 // fetch 1 byte from memory on position of PC
 static inline u8 fetch_byte(Emulator *emu) {
   u8 data = emu->mem[emu->cpu.pc];
@@ -275,9 +287,41 @@ static inline u16 branch_rel(Emulator *emu) {
   return target_addr;
 }
 
+// Push the current values of SR and PC onto the stack
+// Used for function call
+static inline void stack_push(Emulator *emu) {
+  const u16 pc = (htonl(42) == 42) ? swap_bytes(emu->cpu.pc) : emu->cpu.pc;
+  if (emu->cpu.sp > STACK_LIMIT - 3) {
+    stack_overflow(emu);
+  }
+  emu->cpu.sp++;
+  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
+  emu->cpu.sp++;
+  emu->mem[emu->cpu.sp] = pc & 0x00FF;
+  emu->cpu.sp++;
+  emu->mem[emu->cpu.sp] = pc >> 8;
+  sprintf(log_buf, "PC pushed: %04X", pc);
+}
+
+// Pull the value of SR and PC from the stack.
+// Used for function return
+static inline void stack_pull(Emulator *emu) {
+  if (emu->cpu.sp < STACK_FLOOR + 3) {
+    stack_underflow(emu);
+  }
+  u16 pc = *(u16 *)&emu->mem[emu->cpu.sp - 1];
+  if (htonl(42) == 42) {
+    pc = swap_bytes(pc);
+  }
+  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
+  emu->cpu.sp--;
+  sprintf(log_buf, "PC pulled: %04X", pc);
+  emu->cpu.pc = pc;
+}
+
 void emu_print_stack(const Emulator *emu) {
   printw("\t_0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F\n");
-  for (usize i = 0x0100; i <= 0x01FF; i += 16) {
+  for (usize i = STACK_FLOOR; i <= STACK_LIMIT; i += 16) {
     printw("%04X\t%02X %02X %02X %02X %02X %02X %02X %02X "
            "%02X %02X %02X %02X %02X %02X %02X %02X\n",
            (u16)i, emu->mem[i], emu->mem[i + 1], emu->mem[i + 2],
@@ -297,7 +341,7 @@ u16 emu_read_mem_word(const Emulator *emu, const u16 addr) {
   u16 data = emu->mem[addr];
   data |= emu->mem[addr + 1] << 8;
 
-  if (BIG_ENDIAN) {
+  if (htonl(42) == 42) {
     data = swap_bytes(data);
   }
 
@@ -536,6 +580,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_BRK: {
     sprintf(log_buf, "Interrupted (BRK)");
     cpu_reset_flags(&emu->cpu);
+    stack_push(emu);
     emu->cpu.flag_i = true;
     emu->is_running = false;
   } break;
@@ -834,14 +879,8 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // JSR
   case OPCODE_JSR_ABS: {
     const u16 jmp_addr = fetch_word(emu);
-    const u16 ret_addr = emu->cpu.pc;
-    emu->cpu.sp++;
-    emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
-    emu->cpu.sp++;
-    emu->mem[emu->cpu.sp] = ret_addr >> 8;
-    emu->cpu.sp++;
-    emu->mem[emu->cpu.sp] = ret_addr & 0x00FF;
-    sprintf(log_buf, "JSR_ABS: 0x%04x", jmp_addr);
+    stack_push(emu);
+    // sprintf(log_buf, "JSR_ABS: 0x%04x", jmp_addr);
     emu->cpu.pc = jmp_addr;
     emu->cycles += 6;
   } break;
@@ -1057,15 +1096,13 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 7;
   } break;
 
-
     // PHA
   case OPCODE_PHA: {
     emu->cpu.sp++;
     emu->mem[emu->cpu.sp] = emu->cpu.a;
     emu->cycles += 3;
-    if (emu->cpu.sp > 0x01FF) {
-      sprintf(log_buf, "Stack overflowed");
-      emu->is_running = false;
+    if (emu->cpu.sp > STACK_LIMIT) {
+      stack_overflow(emu);
     }
   } break;
 
@@ -1074,9 +1111,8 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cpu.sp++;
     emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
     emu->cycles += 3;
-    if (emu->cpu.sp > 0x01FF) {
-      sprintf(log_buf, "Stack overflowed");
-      emu->is_running = false;
+    if (emu->cpu.sp > STACK_LIMIT) {
+      stack_overflow(emu);
     }
   } break;
 
@@ -1085,9 +1121,8 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cpu.a = emu->mem[emu->cpu.sp];
     emu->cpu.sp--;
     emu->cycles += 4;
-    if (emu->cpu.sp < 0x100) {
-      sprintf(log_buf, "Stack underflowed");
-      emu->is_running = false;
+    if (emu->cpu.sp < STACK_FLOOR) {
+      stack_underflow(emu);
     }
   } break;
 
@@ -1101,6 +1136,12 @@ void emu_tick(Emulator *emu, const bool debug_output) {
       emu->is_running = false;
     }
     cpu_set_stat_from_byte(&emu->cpu, stat);
+  } break;
+
+    // RTS
+  case OPCODE_RTS: {
+    stack_pull(emu);
+    emu->cycles += 6;
   } break;
 
     // SEC
