@@ -157,7 +157,7 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
 static inline void set_flags(Emulator *emu, const u8 byte) {
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_z = (byte == 0);
-  emu->cpu.flag_n = (i8)byte < 0;
+  emu->cpu.flag_n = (byte & 0b10000000) >> 7;
 }
 
 // update flags in the CPU according to register A
@@ -172,10 +172,8 @@ static inline void set_flags_y(Emulator *emu) { set_flags(emu, emu->cpu.y); }
 static inline void cmp(Emulator *emu, const u8 lhs, const u8 rhs) {
   sprintf(log_buf, "cmp: 0x%02X vs 0x%02X", lhs, rhs);
   const u8 sub_result = (lhs - rhs);
-  cpu_reset_flags(&emu->cpu);
-  emu->cpu.flag_z = (lhs == rhs);
+  set_flags(emu, sub_result);
   emu->cpu.flag_c = (lhs >= rhs);
-  emu->cpu.flag_n = sub_result & 0x10000000;
 }
 
 static inline void cmp_a(Emulator *emu, const u8 rhs) {
@@ -232,6 +230,28 @@ static inline void op_bit(Emulator *emu, const u8 x) {
   if ((x & emu->cpu.a) == 0) {
     emu->cpu.flag_z = true;
   }
+}
+
+// Performs ASL operation
+// Returns the result value.
+static inline u8 op_asl(Emulator *emu, const u8 x) {
+  const u8 result = (u8)(x << 1);
+  cpu_reset_flags(&emu->cpu);
+  emu->cpu.flag_n = ((result & 0b10000000) != 0);
+  emu->cpu.flag_z = (result == 0);
+  emu->cpu.flag_c = ((x & 0b00000001) != 0);
+  return result;
+}
+
+// Performs LSR operation
+// Returns the result value.
+static inline u8 op_lsr(Emulator *emu, const u8 x) {
+  const u8 result = (u8)(x >> 1);
+  cpu_reset_flags(&emu->cpu);
+  emu->cpu.flag_n = false;
+  emu->cpu.flag_z = (result == 0);
+  emu->cpu.flag_c = ((x & 0b10000000) != 0);
+  return result;
 }
 
 // Performs a branch operation by relative addressing mode.
@@ -408,27 +428,27 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // ASL
   case OPCODE_ASL_A: {
-    emu->cpu.a <<= 1;
+    emu->cpu.a = op_asl(emu, emu->cpu.a);
     emu->cycles += 2;
   } break;
   case OPCODE_ASL_ZP: {
     const u16 addr = fetch_addr_zp(emu);
-    emu->mem[addr] <<= 1;
+    emu->mem[addr] = op_asl(emu, emu->mem[addr]);
     emu->cycles += 5;
   } break;
   case OPCODE_ASL_ZPX: {
     const u16 addr = fetch_addr_zpx(emu);
-    emu->mem[addr] <<= 1;
+    emu->mem[addr] = op_asl(emu, emu->mem[addr]);
     emu->cycles += 6;
   } break;
   case OPCODE_ASL_ABS: {
     const u16 addr = fetch_addr_abs(emu);
-    emu->mem[addr] <<= 1;
+    emu->mem[addr] = op_asl(emu, emu->mem[addr]);
     emu->cycles += 6;
   } break;
   case OPCODE_ASL_ABSX: {
     const u16 addr = fetch_addr_absx(emu).addr;
-    emu->mem[addr] <<= 1;
+    emu->mem[addr] = op_asl(emu, emu->mem[addr]);
     emu->cycles += 7;
   } break;
 
@@ -1010,6 +1030,33 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     set_flags_y(emu);
     emu->cycles += 4;
   } break;
+
+    // LSR
+  case OPCODE_LSR_A: {
+    emu->cpu.a = op_lsr(emu, emu->cpu.a);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_LSR_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    emu->mem[addr] = op_lsr(emu, emu->mem[addr]);
+    emu->cycles += 5;
+  } break;
+  case OPCODE_LSR_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    emu->mem[addr] = op_lsr(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_LSR_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    emu->mem[addr] = op_lsr(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_LSR_ABSX: {
+    const u16 addr = fetch_addr_absx(emu).addr;
+    emu->mem[addr] = op_lsr(emu, emu->mem[addr]);
+    emu->cycles += 7;
+  } break;
+
 
     // PHA
   case OPCODE_PHA: {

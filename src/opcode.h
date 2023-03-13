@@ -89,10 +89,10 @@
 
 #define OPCODE_DEY 0x88
 
-#define OPCODE_EOR_IM   0x49
-#define OPCODE_EOR_ZP   0x45
-#define OPCODE_EOR_ZPX  0x55
-#define OPCODE_EOR_ABS  0x4D
+#define OPCODE_EOR_IM 0x49
+#define OPCODE_EOR_ZP 0x45
+#define OPCODE_EOR_ZPX 0x55
+#define OPCODE_EOR_ABS 0x4D
 #define OPCODE_EOR_ABSX 0x5D
 #define OPCODE_EOR_ABSY 0x59
 #define OPCODE_EOR_INDX 0x41
@@ -143,6 +143,12 @@
 #define OPCODE_LDY_ZPY 0xB4
 #define OPCODE_LDY_ABS 0xAC
 #define OPCODE_LDY_ABSY 0xBC
+
+#define OPCODE_LSR_A   0x4A
+#define OPCODE_LSR_ZP  0x46
+#define OPCODE_LSR_ZPX 0x56
+#define OPCODE_LSR_ABS 0x4E
+#define OPCODE_LSR_ABSX 0x5E
 
 #define OPCODE_PHA 0x48
 
