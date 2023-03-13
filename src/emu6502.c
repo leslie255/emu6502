@@ -109,12 +109,14 @@ static inline u16 fetch_addr_zp(Emulator *emu) { return fetch_byte(emu); }
 
 // get an address on the position of PC by addressing mode Zero Page X
 static inline u16 fetch_addr_zpx(Emulator *emu) {
-  return fetch_byte(emu) + emu->cpu.x;
+  const u16 addr0 = fetch_byte(emu) + emu->cpu.x;
+  return emu_read_mem_word(emu, addr0);
 }
 
 // get an address on the position of PC by addressing mode Zero Page Y
 static inline u16 fetch_addr_zpy(Emulator *emu) {
-  return fetch_byte(emu) + emu->cpu.y;
+  const u16 addr0 = fetch_byte(emu);
+  return emu_read_mem_word(emu, addr0 + emu->cpu.y);
 }
 
 // get an address on the position of PC by addressing mode Absolute
@@ -148,7 +150,6 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
   const u16 addr0 = fetch_word(emu);
   const u16 addr1 = emu_read_mem_word(emu, addr0) + emu->cpu.y;
   const bool page_crossed = ((addr0 & 0xFF00) != (addr1 & 0xFF00));
-  sprintf(log_buf, "IND,Y:\n\taddr0:%04X\n\taddr1:%04X\n", addr0, addr1);
   return (struct addr_fetch_result){addr1, page_crossed};
 }
 
@@ -202,8 +203,7 @@ carrying_add_u8(const u8 lhs, const u8 rhs, const bool carry) {
 }
 
 static inline void op_adc(Emulator *emu, const u8 rhs) {
-  const __auto_type sum_carry =
-      carrying_add_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
+  const auto sum_carry = carrying_add_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
   set_flags_a(emu);
   emu->cpu.flag_c = sum_carry.carry;
   emu->cpu.flag_v = sum_carry.carry;
@@ -326,7 +326,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_ADC_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -334,7 +334,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_ADC_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -347,7 +347,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_ADC_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -377,7 +377,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_AND_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -385,7 +385,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_AND_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -398,7 +398,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_AND_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -588,7 +588,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_CMP_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cpu.pc++;
     }
@@ -596,7 +596,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_CMP_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cpu.pc++;
     }
@@ -609,7 +609,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_CMP_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cpu.pc++;
     }
@@ -674,7 +674,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_DEC_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -721,7 +721,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_INC_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -767,7 +767,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_EOR_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -775,7 +775,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_EOR_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -788,7 +788,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_EOR_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -853,7 +853,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_ORA_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -861,7 +861,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_ORA_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -874,7 +874,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_ORA_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -908,7 +908,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -917,7 +917,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_LDA_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -932,7 +932,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_LDA_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -967,7 +967,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_LDX_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -1002,7 +1002,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_LDY_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -1091,7 +1091,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 4;
   } break;
   case OPCODE_STA_ABSX: {
-    const __auto_type result = fetch_addr_absx(emu);
+    const auto result = fetch_addr_absx(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -1099,7 +1099,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 5;
   } break;
   case OPCODE_STA_ABSY: {
-    const __auto_type result = fetch_addr_absy(emu);
+    const auto result = fetch_addr_absy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }
@@ -1112,7 +1112,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 6;
   } break;
   case OPCODE_STA_INDY: {
-    const __auto_type result = fetch_addr_indy(emu);
+    const auto result = fetch_addr_indy(emu);
     if (result.page_crossed) {
       emu->cycles++;
     }

@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define var __auto_type
+#define auto __auto_type
 
 typedef uint64_t u64;
 typedef uint32_t u32;
@@ -22,6 +22,7 @@ typedef double f64;
 typedef size_t usize;
 typedef ssize_t isize;
 
+[[maybe_unused]]
 static inline u16 swap_bytes(const u16 data) {
   return ((data << 8) & 0xff00) | ((data >> 8) & 0x00ff);
 }
