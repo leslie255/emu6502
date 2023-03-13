@@ -17,6 +17,8 @@ The emulator outputs a debug interface which traces the CPU and stack step by st
 
 An assembler is also going to be added.
 
+Note that the emulator likely won't work in big endian platforms.
+
 ## LICENSE
 
 This project is licensed under GPLv3, earlier versions that did not have the `LICENSE.txt` is licensed under ALL RIGHTS RESERVED.
