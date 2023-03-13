@@ -164,6 +164,12 @@
 #define OPCODE_ROL_ABS 0x2E
 #define OPCODE_ROL_ABSX 0x3E
 
+#define OPCODE_ROR_A 0x6A
+#define OPCODE_ROR_ZP 0x66
+#define OPCODE_ROR_ZPX 0x76
+#define OPCODE_ROR_ABS 0x6E
+#define OPCODE_ROR_ABSX 0x7E
+
 #define OPCODE_RTI 0x40
 #define OPCODE_RTS 0x60
 

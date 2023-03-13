@@ -271,7 +271,7 @@ static inline u8 op_asl(Emulator *emu, const u8 x) {
 // Performs LSR operation
 // Returns the result value.
 static inline u8 op_lsr(Emulator *emu, const u8 x) {
-  const u8 result = (u8)(x >> 1);
+  const u8 result = (x >> 1);
   cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_n = false;
   emu->cpu.flag_z = (result == 0);
@@ -282,9 +282,18 @@ static inline u8 op_lsr(Emulator *emu, const u8 x) {
 // Performs ROL operation
 // Returns the result value.
 static inline u8 op_rol(Emulator *emu, const u8 x) {
-  const u8 result = (u8)(x >> 1) | emu->cpu.flag_c;
+  const u8 result = (u8)(x << 1) | emu->cpu.flag_c;
   set_nz_flags(emu, result);
   emu->cpu.flag_c = ((x & 0b10000000) != 0);
+  return result;
+}
+
+// Performs ROR operation
+// Returns the result value.
+static inline u8 op_ror(Emulator *emu, const u8 x) {
+  const u8 result = (x >> 1) | (u8)(emu->cpu.flag_c << 7);
+  set_nz_flags(emu, result);
+  emu->cpu.flag_c = ((x & 0b00000001) != 0);
   return result;
 }
 
@@ -1185,6 +1194,32 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_ROL_ABSX: {
     const u16 addr = fetch_addr_absx(emu).addr;
     emu->mem[addr] = op_rol(emu, emu->mem[addr]);
+    emu->cycles += 7;
+  } break;
+
+    // ROR
+  case OPCODE_ROR_A: {
+    emu->cpu.a = op_ror(emu, emu->cpu.a);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_ROR_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    emu->mem[addr] = op_ror(emu, emu->mem[addr]);
+    emu->cycles += 5;
+  } break;
+  case OPCODE_ROR_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    emu->mem[addr] = op_ror(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ROR_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    emu->mem[addr] = op_ror(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_ROR_ABSX: {
+    const u16 addr = fetch_addr_absx(emu).addr;
+    emu->mem[addr] = op_ror(emu, emu->mem[addr]);
     emu->cycles += 7;
   } break;
 

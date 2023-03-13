@@ -37,9 +37,9 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_SEC);
   mem_write_byte(&writer, OPCODE_LDA_IM);
-  mem_write_byte(&writer, 0b10101010);
+  mem_write_byte(&writer, 0b01000001);
+  mem_write_byte(&writer, OPCODE_SEC);
   mem_write_byte(&writer, OPCODE_ROL_A);
 
   bool less_io = false;
