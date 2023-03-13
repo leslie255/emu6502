@@ -178,7 +178,6 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
 
 // update flags in the CPU according to a byte
 static inline void set_nz_flags(Emulator *emu, const u8 byte) {
-  cpu_reset_flags(&emu->cpu);
   emu->cpu.flag_z = (byte == 0);
   emu->cpu.flag_n = (byte & 0b10000000) >> 7;
 }
@@ -217,16 +216,23 @@ static inline void cmp_y(Emulator *emu, const u8 rhs) {
   cmp(emu, emu->cpu.y, rhs);
 }
 
-struct carrying_add_result_u8 {
-  u8 sum;
+struct carrying_op_result_u8 {
+  u8 result;
   bool carry;
 };
 
-static inline struct carrying_add_result_u8
+static inline struct carrying_op_result_u8
 carrying_add_u8(const u8 lhs, const u8 rhs, const bool carry) {
-  const u8 sum = lhs + rhs + carry;
-  const bool carry_out = (sum < lhs || sum < rhs || sum < carry);
-  return (struct carrying_add_result_u8){sum, carry_out};
+  const u8 sum = (carry * 0xFF) + lhs + rhs;
+  const bool carry_out = (sum < lhs || sum < rhs || sum < (carry * 0xFF));
+  return (struct carrying_op_result_u8){sum, carry_out};
+}
+
+static inline struct carrying_op_result_u8
+carrying_sub_u8(const u8 lhs, const u8 rhs, const bool carry) {
+  const u8 dif = carry * 0xFF + lhs - rhs;
+  const bool carry_out = (dif > lhs && dif > rhs && dif > (carry * 0xFF));
+  return (struct carrying_op_result_u8){dif, carry_out};
 }
 
 static inline void op_adc(Emulator *emu, const u8 rhs) {
@@ -234,7 +240,15 @@ static inline void op_adc(Emulator *emu, const u8 rhs) {
   set_nz_flags_a(emu);
   emu->cpu.flag_c = sum_carry.carry;
   emu->cpu.flag_v = sum_carry.carry;
-  emu->cpu.a = sum_carry.sum;
+  emu->cpu.a = sum_carry.result;
+}
+
+static inline void op_sbc(Emulator *emu, const u8 rhs) {
+  const auto dif_carry = carrying_sub_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
+  set_nz_flags_a(emu);
+  emu->cpu.flag_c = dif_carry.carry;
+  emu->cpu.flag_v = dif_carry.carry;
+  emu->cpu.a = dif_carry.result;
 }
 
 static inline void op_and(Emulator *emu, const u8 rhs) {
@@ -1234,6 +1248,57 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_RTS: {
     stack_pull(emu);
     emu->cycles += 6;
+  } break;
+
+  // SBC
+  case OPCODE_SBC_IM: {
+    const u8 rhs = fetch_byte(emu);
+    op_sbc(emu, rhs);
+    emu->cycles += 2;
+  } break;
+  case OPCODE_SBC_ZP: {
+    const u16 addr = fetch_addr_zp(emu);
+    op_sbc(emu, emu->mem[addr]);
+    emu->cycles += 3;
+  } break;
+  case OPCODE_SBC_ZPX: {
+    const u16 addr = fetch_addr_zpx(emu);
+    op_sbc(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_SBC_ABS: {
+    const u16 addr = fetch_addr_abs(emu);
+    op_sbc(emu, emu->mem[addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_SBC_ABSX: {
+    const auto result = fetch_addr_absx(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_sbc(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_SBC_ABSY: {
+    const auto result = fetch_addr_absy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_sbc(emu, emu->mem[result.addr]);
+    emu->cycles += 4;
+  } break;
+  case OPCODE_SBC_INDX: {
+    const u16 addr = fetch_addr_indx(emu);
+    op_sbc(emu, emu->mem[addr]);
+    emu->cycles += 6;
+  } break;
+  case OPCODE_SBC_INDY: {
+    const auto result = fetch_addr_indy(emu);
+    if (result.page_crossed) {
+      emu->cycles++;
+    }
+    op_sbc(emu, emu->mem[result.addr]);
+    emu->cycles += 5;
   } break;
 
     // SEC

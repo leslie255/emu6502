@@ -173,6 +173,15 @@
 #define OPCODE_RTI 0x40
 #define OPCODE_RTS 0x60
 
+#define OPCODE_SBC_IM 0xE9
+#define OPCODE_SBC_ZP 0xE5
+#define OPCODE_SBC_ZPX 0xF5
+#define OPCODE_SBC_ABS 0xED
+#define OPCODE_SBC_ABSX 0xFD
+#define OPCODE_SBC_ABSY 0xF9
+#define OPCODE_SBC_INDX 0xE1
+#define OPCODE_SBC_INDY 0xF1
+
 #define OPCODE_SEC 0x38
 
 #define OPCODE_SED 0xF8
