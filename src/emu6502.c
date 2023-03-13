@@ -306,11 +306,11 @@ static inline void stack_push(Emulator *emu) {
     stack_overflow(emu);
   }
   emu->cpu.sp++;
-  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
-  emu->cpu.sp++;
   emu->mem[emu->cpu.sp] = pc & 0x00FF;
   emu->cpu.sp++;
   emu->mem[emu->cpu.sp] = pc >> 8;
+  emu->cpu.sp++;
+  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
   LPRINTF("PC pushed: %04X", pc);
 }
 
@@ -320,12 +320,13 @@ static inline void stack_pull(Emulator *emu) {
   if (emu->cpu.sp < STACK_FLOOR + 2) {
     stack_underflow(emu);
   }
+  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
+  emu->cpu.sp--;
   u16 pc = *(u16 *)&emu->mem[emu->cpu.sp - 1];
   if (htonl(42) == 42) {
     pc = swap_bytes(pc);
   }
-  emu->mem[emu->cpu.sp] = cpu_stat_get_byte(&emu->cpu);
-  emu->cpu.sp--;
+  emu->cpu.sp -= 2;
   LPRINTF("PC pulled: %04X", pc);
   emu->cpu.pc = pc;
 }

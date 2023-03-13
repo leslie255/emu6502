@@ -36,22 +36,6 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
-  mem_write_byte(&writer, OPCODE_NOP);
   mem_write_byte(&writer, OPCODE_PLA);
   mem_write_byte(&writer, OPCODE_PLA);
   mem_write_byte(&writer, OPCODE_PLA);
