@@ -144,8 +144,8 @@
 #define OPCODE_LDY_ABS 0xAC
 #define OPCODE_LDY_ABSY 0xBC
 
-#define OPCODE_LSR_A   0x4A
-#define OPCODE_LSR_ZP  0x46
+#define OPCODE_LSR_A 0x4A
+#define OPCODE_LSR_ZP 0x46
 #define OPCODE_LSR_ZPX 0x56
 #define OPCODE_LSR_ABS 0x4E
 #define OPCODE_LSR_ABSX 0x5E
@@ -157,6 +157,12 @@
 #define OPCODE_PLA 0x68
 
 #define OPCODE_PLP 0x28
+
+#define OPCODE_ROL_A 0x2A
+#define OPCODE_ROL_ZP 0x26
+#define OPCODE_ROL_ZPX 0x36
+#define OPCODE_ROL_ABS 0x2E
+#define OPCODE_ROL_ABSX 0x3E
 
 #define OPCODE_RTI 0x40
 #define OPCODE_RTS 0x60

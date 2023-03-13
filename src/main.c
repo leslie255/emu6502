@@ -3,6 +3,7 @@
 #include "opcode.h"
 
 #include <ncurses.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct MemWriter {
@@ -36,11 +37,10 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_PLA);
-  mem_write_byte(&writer, OPCODE_PLA);
-  mem_write_byte(&writer, OPCODE_PLA);
-  mem_write_byte(&writer, OPCODE_JMP_ABS);
-  mem_write_word(&writer, 0xFFFC);
+  mem_write_byte(&writer, OPCODE_SEC);
+  mem_write_byte(&writer, OPCODE_LDA_IM);
+  mem_write_byte(&writer, 0b10101010);
+  mem_write_byte(&writer, OPCODE_ROL_A);
 
   bool less_io = false;
 
@@ -55,13 +55,20 @@ i32 main(i32 argc, char *argv[]) {
   printf("initialized\n");
 
   if (less_io) {
+    clock_t prev_time = clock();
     while (true) {
-      if (emu.is_running) {
-        if (emu.cycles % 8000000 == 0) {
-          printf("%llu cycles\n", emu.cycles);
-        }
-        emu_tick(&emu, false);
+      if (!emu.is_running) {
+        printf("Emulator halted at %llu cycles\n", emu.cycles);
+        break;
       }
+      if (emu.cycles % 128000000 == 0) {
+        clock_t current_time = clock();
+        f64 d = (f64)(current_time - prev_time) / (f64)CLOCKS_PER_SEC;
+        f64 clock_speed = 128.0f * (1 / d);
+        printf("%.2lf\tMHz\n", clock_speed);
+        prev_time = current_time;
+      }
+      emu_tick(&emu, false);
     }
   } else {
     initscr();
