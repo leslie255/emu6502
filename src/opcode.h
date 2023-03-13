@@ -158,6 +158,7 @@
 
 #define OPCODE_PLP 0x28
 
+#define OPCODE_RTI 0x40
 #define OPCODE_RTS 0x60
 
 #define OPCODE_SEC 0x38

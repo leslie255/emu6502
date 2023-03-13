@@ -1151,6 +1151,13 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     cpu_set_stat_from_byte(&emu->cpu, stat);
   } break;
 
+    // RTI
+  case OPCODE_RTI: {
+    stack_pull(emu);
+    emu->cpu.flag_i = false;
+    emu->is_running = true;
+  } break;
+
     // RTS
   case OPCODE_RTS: {
     stack_pull(emu);
