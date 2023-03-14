@@ -39,12 +39,11 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_SED);
-  mem_write_byte(&writer, OPCODE_SEC);
-  mem_write_byte(&writer, OPCODE_LDA_IM);
-  mem_write_byte(&writer, 0x10);
-  mem_write_byte(&writer, OPCODE_SBC_IM);
-  mem_write_byte(&writer, 0x22);
+  mem_write_byte(&writer, OPCODE_PLA);
+  mem_write_byte(&writer, OPCODE_PLA);
+  mem_write_byte(&writer, OPCODE_PLA);
+  mem_write_byte(&writer, OPCODE_JMP_ABS);
+  mem_write_word(&writer, 0xFFFC);
 
   bool less_io = false;
 
@@ -60,6 +59,7 @@ i32 main(i32 argc, char *argv[]) {
 
   if (less_io) {
     clock_t prev_time = clock();
+    u64 prev_cycles = 1;
     while (true) {
       if (!emu.is_running) {
         printf("Emulator halted at %llu cycles\n", emu.cycles);
@@ -68,9 +68,10 @@ i32 main(i32 argc, char *argv[]) {
       if (emu.cycles % 128000000 == 0) {
         clock_t current_time = clock();
         f64 d = (f64)(current_time - prev_time) / (f64)CLOCKS_PER_SEC;
-        f64 clock_speed = 128.0f * (1 / d);
+        f64 clock_speed = (f64)(emu.cycles - prev_cycles) * (1.0f / d) / 10000000.0f;
         printf("%.2lf\tMHz\n", clock_speed);
         prev_time = current_time;
+        prev_cycles = emu.cycles;
       }
       emu_tick(&emu, false);
     }
