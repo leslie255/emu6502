@@ -2,7 +2,7 @@
 (-): Only partially implemented
 ( ): Unimplented
 
-ADC (-)   JSR (x)
+ADC (x)   JSR (x)
 AND (x)   LDA (x)
 ASL (x)   LDX (x)
 BCC (x)   LDY (x)
@@ -31,4 +31,4 @@ INX (x)   TXA (x)
 INY (x)   TXS (x)
 JMP (x)   TYA (x)
 
-* ADC and ABC only works in integer mode, decimal mode is not implemented yet
+* SBC only works in integer mode, decimal mode is not implemented yet

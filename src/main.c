@@ -1,3 +1,4 @@
+#include "calc.h"
 #include "common.h"
 #include "emu6502.h"
 #include "opcode.h"
@@ -29,6 +30,10 @@ void mem_write_word(MemWriter *memw, u16 word) {
 }
 
 i32 main(i32 argc, char *argv[]) {
+
+  const auto result_carry = carrying_bcd_add_u8(0x55, 0x50, 1);
+  printf("%02X, %1X\n", result_carry.result, result_carry.carry);
+
   Emulator emu;
   emu_init(&emu);
   MemWriter writer = memw_init(emu.mem);
@@ -37,14 +42,12 @@ i32 main(i32 argc, char *argv[]) {
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
+  mem_write_byte(&writer, OPCODE_SED);
+  mem_write_byte(&writer, OPCODE_SEC);
   mem_write_byte(&writer, OPCODE_LDA_IM);
-  mem_write_byte(&writer, 56);
-  mem_write_byte(&writer, OPCODE_SBC_IM);
-  mem_write_byte(&writer, 60);
-  mem_write_byte(&writer, OPCODE_LDA_IM);
-  mem_write_byte(&writer, 0);
-  mem_write_byte(&writer, OPCODE_SBC_IM);
-  mem_write_byte(&writer, 10);
+  mem_write_byte(&writer, 0x55);
+  mem_write_byte(&writer, OPCODE_ADC_IM);
+  mem_write_byte(&writer, 0x50);
 
   bool less_io = false;
 

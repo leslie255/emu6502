@@ -1,13 +1,15 @@
 CC = gcc
-CFLAGS = -Wall --std=gnu2x -lncurses -O2
+CFLAGS = -Wall -Wconversions --std=gnu2x -lncurses
+
+OPT_LEVEL = -O2
 
 all: bin/main.o bin/emu6502.o bin/emu6502
 
 bin/main.o: src/main.c src/common.h src/opcode.h
-	$(CC) $(CFLAGS) -c src/main.c -o bin/main.o
+	$(CC) $(CFLAGS) $(OPT_LEVEL) -c src/main.c -o bin/main.o
 
 bin/emu6502.o: src/emu6502.c src/emu6502.h src/common.h src/opcode.h
-	$(CC) $(CFLAGS) -c src/emu6502.c -o bin/emu6502.o
+	$(CC) $(CFLAGS) $(OPT_LEVEL) -c src/emu6502.c -o bin/emu6502.o
 
 bin/emu6502: bin/main.o bin/emu6502.o
-	$(CC) $(CFLAGS) bin/*.o -o bin/emu6502
+	$(CC) $(CFLAGS) $(OPT_LEVEL) bin/*.o -o bin/emu6502
