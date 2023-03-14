@@ -35,15 +35,17 @@ i32 main(i32 argc, char *argv[]) {
   emu_init(&emu);
   MemWriter writer = memw_init(emu.mem);
 
-  mem_write_byte(&writer, OPCODE_JSR_ABS);
+  mem_write_byte(&writer, OPCODE_JMP_ABS);
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_PLA);
-  mem_write_byte(&writer, OPCODE_PLA);
-  mem_write_byte(&writer, OPCODE_PLA);
+  mem_write_byte(&writer, OPCODE_JSR_ABS);
+  mem_write_word(&writer, 0x1020);
   mem_write_byte(&writer, OPCODE_JMP_ABS);
-  mem_write_word(&writer, 0xFFFC);
+  mem_write_word(&writer, 0x0800);
+
+  writer.head = 0x1020;
+  mem_write_byte(&writer, OPCODE_RTS);
 
   bool less_io = false;
 
