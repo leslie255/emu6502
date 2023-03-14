@@ -1,7 +1,5 @@
 # Leslie255's Commodore 6502 Emulator
 
-Progress of this project is recorded in `progress.txt`.
-
 A reference sheet for the MOS 6502 instruction set can be found at: [https://www.masswerk.at/6502/6502_instruction_set.html](https://www.masswerk.at/6502/6502_instruction_set.html)
 
 ## How to Use
@@ -18,6 +16,14 @@ The emulator outputs a debug interface which traces the CPU and stack step by st
 An assembler is also going to be added.
 
 Note that the emulator likely won't work in big endian platforms.
+
+## Future Plans
+
+All the instructions have been implemented by now, but there are still some extra work to do to make the emulator actually useful, namely:
+
+- IO & Interrupts *(Currently `BRK` and `RTI` instructions technically work, but the emulator cannot be recovered from an interrupt)*
+- Clockspeed limiter
+- Loading from images
 
 ## LICENSE
 
