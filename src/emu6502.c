@@ -218,12 +218,12 @@ static inline void cmp_y(Emulator *emu, const u8 rhs) {
 }
 
 static inline void op_adc(Emulator *emu, const u8 rhs) {
-  const auto sum_carry =
-      emu->cpu.flag_d ? carrying_bcd_add_u8(emu->cpu.a, rhs, emu->cpu.flag_c)
-                      : carrying_add_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
-  LPRINTF("%02X + %02X + %01X :\n\ts: %02X\n\tc: %1X\n(decimal mode: %s)\n",
-          emu->cpu.a, rhs, emu->cpu.flag_c, sum_carry.result, sum_carry.carry,
-          emu->cpu.flag_d ? "on" : "off");
+  const auto f = emu->cpu.flag_d ? carrying_bcd_add_u8 : carrying_add_u8;
+  const auto sum_carry = f(emu->cpu.a, rhs, emu->cpu.flag_c);
+  LPRINTF(
+      "%02X(a) + %02X(m) + %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
+      emu->cpu.a, rhs, emu->cpu.flag_c, sum_carry.result, sum_carry.carry,
+      emu->cpu.flag_d ? "on" : "off");
   set_nz_flags_a(emu);
   emu->cpu.flag_c = sum_carry.carry;
   emu->cpu.flag_v = sum_carry.carry;
@@ -231,9 +231,12 @@ static inline void op_adc(Emulator *emu, const u8 rhs) {
 }
 
 static inline void op_sbc(Emulator *emu, const u8 rhs) {
-  const auto dif_carry =
-      emu->cpu.flag_d ? carrying_bcd_sub_u8(emu->cpu.a, rhs, emu->cpu.flag_c)
-                      : carrying_sub_u8(emu->cpu.a, rhs, emu->cpu.flag_c);
+  const auto f = emu->cpu.flag_d ? carrying_bcd_sub_u8 : carrying_sub_u8;
+  const auto dif_carry = f(emu->cpu.a, rhs, emu->cpu.flag_c);
+  LPRINTF(
+      "%02X(a) - %02X(m) - %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
+      emu->cpu.a, rhs, emu->cpu.flag_c, dif_carry.result, dif_carry.carry,
+      emu->cpu.flag_d ? "on" : "off");
   set_nz_flags_a(emu);
   emu->cpu.flag_c = dif_carry.carry;
   emu->cpu.flag_v = dif_carry.carry;
