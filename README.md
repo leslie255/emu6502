@@ -11,9 +11,7 @@ $ mkdir bin
 $ make all && ./bin/emu6502
 ```
 
-The emulator outputs a debug interface which traces the CPU and stack step by step, which can slow down the performance significantly. To disable that, add `--less-io` option to only output a `{x} cycles` prompt every 8 million ticks.
-
-An assembler is also going to be added.
+By default, the emulator outputs a CLI debug interface that traces the state of the CPU and memory step by step. This can slow down the performance significantly. To run the emulator at maximum speed, add `--less-io` option to only output a `{x} MHz` prompt every 128 million cycles.
 
 Note that the emulator likely won't work in big endian platforms.
 
@@ -23,7 +21,8 @@ All the instructions have been implemented by now, but there are still some extr
 
 - IO & Interrupts *(Currently `BRK` and `RTI` instructions technically work, but the emulator cannot be recovered from an interrupt)*
 - Clockspeed limiter
-- Loading from images
+- Loading from memory/disk snapshots
+- An assembler
 
 ## LICENSE
 
