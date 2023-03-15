@@ -8,18 +8,24 @@
 #define STACK_LIMIT 0x01FF
 
 typedef struct CPU {
-  u16 pc;      // Program Counter
-  u8 sp;       // Stack Pointer
-  u8 a;        // Register A
-  u8 x;        // Register X
-  u8 y;        // Register Y
-  bool flag_c; // Carry Flag
-  bool flag_z; // Zero Flag
-  bool flag_i; // Interrupt Disable
-  bool flag_d; // Decimal Mode
-  bool flag_b; // Break Command
-  bool flag_v; // Overflow Flag
-  bool flag_n; // Negative Flag
+  u16 pc; // Program Counter
+  u8 sp;  // Stack Pointer
+  u8 a;   // Register A
+  u8 x;   // Register X
+  u8 y;   // Register Y
+  union {
+    u8 byte;
+    struct {
+      bool n : 1;
+      bool v : 1;
+      bool _ : 1;
+      bool b : 1;
+      bool d : 1;
+      bool i : 1;
+      bool z : 1;
+      bool c : 1;
+    } bits;
+  } sr;
 } CPU;
 
 typedef struct Emulator {
@@ -38,13 +44,6 @@ void cpu_reset_sr(CPU *cpu);
 
 // Resets the CPU to its initial state
 void cpu_reset(CPU *cpu);
-
-// Get the status flags of the CPU as a single byte
-u8 cpu_get_sr(const CPU *cpu);
-
-// Set the status flags from a single byte, in the same format of
-// `cpu_stat_get_byte(...)`
-void cpu_set_sr_from_byte(CPU *cpu, const u8 stat);
 
 // Outputs the registers and status flags of a CPU
 // Output has newline characters

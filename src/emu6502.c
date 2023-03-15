@@ -18,46 +18,12 @@ static char log_buf[LOG_BUF_SIZE] = {0};
 
 void mem_init(u8 *mem) { bzero(mem, MEM_SIZE); }
 
-void cpu_reset_sr(CPU *cpu) {
-  cpu->flag_c = false;
-  cpu->flag_z = false;
-  cpu->flag_i = false;
-  cpu->flag_d = false;
-  cpu->flag_b = false;
-  cpu->flag_v = false;
-  cpu->flag_n = false;
-}
+void cpu_reset_sr(CPU *cpu) { cpu->sr.byte = 0; }
 
 void cpu_reset(CPU *cpu) {
   cpu->pc = 0xFFFC;
   cpu->sp = 0xFF;
   cpu_reset_sr(cpu);
-}
-
-u8 cpu_get_sr(const CPU *cpu) {
-  u8 stat = 0;
-  stat |= cpu->flag_n << 7;
-  stat |= cpu->flag_v << 6;
-  //-------------------- 5;
-  stat |= cpu->flag_b << 4;
-  stat |= cpu->flag_d << 3;
-  stat |= cpu->flag_i << 2;
-  stat |= cpu->flag_z << 1;
-  stat |= cpu->flag_c << 0;
-
-  return stat;
-}
-
-void cpu_set_sr_from_byte(CPU *cpu, const u8 stat) {
-  cpu_reset_sr(cpu);
-  cpu->flag_n = (stat & 0b10000000) >> 7;
-  cpu->flag_v = (stat & 0b01000000) >> 6;
-  //---------------------------------- 5;
-  cpu->flag_b = (stat & 0b00010000) >> 4;
-  cpu->flag_d = (stat & 0b00001000) >> 3;
-  cpu->flag_i = (stat & 0b00000100) >> 2;
-  cpu->flag_z = (stat & 0b00000010) >> 1;
-  cpu->flag_c = (stat & 0b00000001) >> 0;
 }
 
 static inline char zero_or_one(const u8 x) { return (x == 0) ? '0' : '1'; }
@@ -73,10 +39,10 @@ void cpu_debug_print(const CPU *cpu) {
          "%c   %c   %c   %c   %c   %c   %c\n",
          cpu->pc, cpu->pc, (i16)cpu->pc, cpu->sp, cpu->sp, (i8)cpu->sp, cpu->a,
          cpu->a, (i8)cpu->a, cpu->x, cpu->x, (i8)cpu->x, cpu->y, cpu->y,
-         (i8)cpu->y, zero_or_one(cpu->flag_c), zero_or_one(cpu->flag_z),
-         zero_or_one(cpu->flag_i), zero_or_one(cpu->flag_d),
-         zero_or_one(cpu->flag_b), zero_or_one(cpu->flag_v),
-         zero_or_one(cpu->flag_n));
+         (i8)cpu->y, zero_or_one(cpu->sr.bits.c), zero_or_one(cpu->sr.bits.z),
+         zero_or_one(cpu->sr.bits.i), zero_or_one(cpu->sr.bits.d),
+         zero_or_one(cpu->sr.bits.b), zero_or_one(cpu->sr.bits.v),
+         zero_or_one(cpu->sr.bits.n));
 }
 
 void emu_init(Emulator *emu) {
@@ -167,8 +133,8 @@ static inline struct addr_fetch_result fetch_addr_indy(Emulator *emu) {
 
 // update flags in the CPU according to a byte
 static inline void set_nz_flags(Emulator *emu, const u8 byte) {
-  emu->cpu.flag_z = (byte == 0);
-  emu->cpu.flag_n = (byte & 0b10000000) >> 7;
+  emu->cpu.sr.bits.z = (byte == 0);
+  emu->cpu.sr.bits.n = (byte & 0b10000000) >> 7;
 }
 
 // update flags in the CPU according to register A
@@ -190,7 +156,7 @@ static inline void cmp(Emulator *emu, const u8 lhs, const u8 rhs) {
   LPRINTF("cmp: 0x%02X vs 0x%02X\n", lhs, rhs);
   const u8 sub_result = (lhs - rhs);
   set_nz_flags(emu, sub_result);
-  emu->cpu.flag_c = (lhs >= rhs);
+  emu->cpu.sr.bits.c = (lhs >= rhs);
 }
 
 static inline void cmp_a(Emulator *emu, const u8 rhs) {
@@ -206,28 +172,28 @@ static inline void cmp_y(Emulator *emu, const u8 rhs) {
 }
 
 static inline void op_adc(Emulator *emu, const u8 rhs) {
-  const auto f = emu->cpu.flag_d ? carrying_bcd_add_u8 : carrying_add_u8;
-  const auto sum_carry = f(emu->cpu.a, rhs, emu->cpu.flag_c);
+  const auto f = emu->cpu.sr.bits.d ? carrying_bcd_add_u8 : carrying_add_u8;
+  const auto sum_carry = f(emu->cpu.a, rhs, emu->cpu.sr.bits.c);
   LPRINTF(
       "%02X(a) + %02X(m) + %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
-      emu->cpu.a, rhs, emu->cpu.flag_c, sum_carry.result, sum_carry.carry,
-      emu->cpu.flag_d ? "on" : "off");
+      emu->cpu.a, rhs, emu->cpu.sr.bits.c, sum_carry.result, sum_carry.carry,
+      emu->cpu.sr.bits.d ? "on" : "off");
   set_nz_flags_a(emu);
-  emu->cpu.flag_c = sum_carry.carry;
-  emu->cpu.flag_v = sum_carry.carry;
+  emu->cpu.sr.bits.c = sum_carry.carry;
+  emu->cpu.sr.bits.v = sum_carry.carry;
   emu->cpu.a = sum_carry.result;
 }
 
 static inline void op_sbc(Emulator *emu, const u8 rhs) {
-  const auto f = emu->cpu.flag_d ? carrying_bcd_sub_u8 : carrying_sub_u8;
-  const auto dif_carry = f(emu->cpu.a, rhs, emu->cpu.flag_c);
+  const auto f = emu->cpu.sr.bits.d ? carrying_bcd_sub_u8 : carrying_sub_u8;
+  const auto dif_carry = f(emu->cpu.a, rhs, emu->cpu.sr.bits.c);
   LPRINTF(
       "%02X(a) - %02X(m) - %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
-      emu->cpu.a, rhs, emu->cpu.flag_c, dif_carry.result, dif_carry.carry,
-      emu->cpu.flag_d ? "on" : "off");
+      emu->cpu.a, rhs, emu->cpu.sr.bits.c, dif_carry.result, dif_carry.carry,
+      emu->cpu.sr.bits.d ? "on" : "off");
   set_nz_flags_a(emu);
-  emu->cpu.flag_c = dif_carry.carry;
-  emu->cpu.flag_v = dif_carry.carry;
+  emu->cpu.sr.bits.c = dif_carry.carry;
+  emu->cpu.sr.bits.v = dif_carry.carry;
   emu->cpu.a = dif_carry.result;
 }
 
@@ -248,9 +214,9 @@ static inline void op_eor(Emulator *emu, const u8 rhs) {
 
 static inline void op_bit(Emulator *emu, const u8 x) {
   cpu_reset_sr(&emu->cpu);
-  emu->cpu.flag_n = (x & 0b10000000) >> 7;
-  emu->cpu.flag_v = (x & 0b01000000) >> 6;
-  emu->cpu.flag_z = ((x & emu->cpu.a) == 0);
+  emu->cpu.sr.bits.n = (x & 0b10000000) >> 7;
+  emu->cpu.sr.bits.v = (x & 0b01000000) >> 6;
+  emu->cpu.sr.bits.z = ((x & emu->cpu.a) == 0);
 }
 
 // Performs ASL operation
@@ -258,7 +224,7 @@ static inline void op_bit(Emulator *emu, const u8 x) {
 static inline u8 op_asl(Emulator *emu, const u8 x) {
   const u8 result = (u8)(x << 1);
   set_nz_flags(emu, result);
-  emu->cpu.flag_c = ((x & 0b10000000) != 0);
+  emu->cpu.sr.bits.c = ((x & 0b10000000) != 0);
   return result;
 }
 
@@ -267,27 +233,27 @@ static inline u8 op_asl(Emulator *emu, const u8 x) {
 static inline u8 op_lsr(Emulator *emu, const u8 x) {
   const u8 result = (x >> 1);
   cpu_reset_sr(&emu->cpu);
-  emu->cpu.flag_n = false;
-  emu->cpu.flag_z = (result == 0);
-  emu->cpu.flag_c = ((x & 0b00000001) != 0);
+  emu->cpu.sr.bits.n = false;
+  emu->cpu.sr.bits.z = (result == 0);
+  emu->cpu.sr.bits.c = ((x & 0b00000001) != 0);
   return result;
 }
 
 // Performs ROL operation
 // Returns the result value.
 static inline u8 op_rol(Emulator *emu, const u8 x) {
-  const u8 result = (u8)(x << 1) | emu->cpu.flag_c;
+  const u8 result = (u8)(x << 1) | emu->cpu.sr.bits.c;
   set_nz_flags(emu, result);
-  emu->cpu.flag_c = ((x & 0b10000000) != 0);
+  emu->cpu.sr.bits.c = ((x & 0b10000000) != 0);
   return result;
 }
 
 // Performs ROR operation
 // Returns the result value.
 static inline u8 op_ror(Emulator *emu, const u8 x) {
-  const u8 result = (x >> 1) | (u8)(emu->cpu.flag_c << 7);
+  const u8 result = (x >> 1) | (u8)(emu->cpu.sr.bits.c << 7);
   set_nz_flags(emu, result);
-  emu->cpu.flag_c = ((x & 0b00000001) != 0);
+  emu->cpu.sr.bits.c = ((x & 0b00000001) != 0);
   return result;
 }
 
@@ -327,16 +293,16 @@ static inline u8 stack_pull(Emulator *emu) {
 // Used for function call
 static inline void push_callstack(Emulator *emu) {
   const u16 pc = emu->cpu.pc;
+  LPRINTF("PC pushed: %04X\n", pc);
   stack_push(emu, pc & 0x00FF);
   stack_push(emu, pc >> 8);
-  stack_push(emu, cpu_get_sr(&emu->cpu));
-  LPRINTF("PC pushed: %04X\n", pc);
+  stack_push(emu, emu->cpu.sr.byte);
 }
 
 // Pull the value of SR and PC from the stack.
 // Used for function return
 static inline void pull_callstack(Emulator *emu) {
-  cpu_set_sr_from_byte(&emu->cpu, stack_pull(emu));
+  emu->cpu.sr.byte = stack_pull(emu);
   u16 pc = (u16)(stack_pull(emu) << 8);
   pc |= stack_pull(emu);
   emu->cpu.pc = pc;
@@ -524,7 +490,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BCC
   case OPCODE_BCC_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_c == false) {
+    if (emu->cpu.sr.bits.c == false) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BCC: 0x%04X\n", target_addr);
     } else {
@@ -535,7 +501,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BCS
   case OPCODE_BCS_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_c == true) {
+    if (emu->cpu.sr.bits.c == true) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BCC: 0x%04X\n", target_addr);
     } else {
@@ -546,7 +512,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BEQ
   case OPCODE_BEQ_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_z == true) {
+    if (emu->cpu.sr.bits.z == true) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BEQ: 0x%04X\n", target_addr);
     } else {
@@ -571,7 +537,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BMI
   case OPCODE_BMI_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_n == true) {
+    if (emu->cpu.sr.bits.n == true) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BMI: 0x%04X\n", target_addr);
     } else {
@@ -582,7 +548,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BNE
   case OPCODE_BNE_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_z == false) {
+    if (emu->cpu.sr.bits.z == false) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BNE: 0x%04X\n", target_addr);
     } else {
@@ -593,7 +559,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BPL
   case OPCODE_BPL_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_n == false) {
+    if (emu->cpu.sr.bits.n == false) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BPL: 0x%04X\n", target_addr);
     } else {
@@ -606,14 +572,14 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     LPRINTF("Interrupted (BRK)\n");
     cpu_reset_sr(&emu->cpu);
     push_callstack(emu);
-    emu->cpu.flag_i = true;
+    emu->cpu.sr.bits.i = true;
     emu->is_running = false;
   } break;
 
     // BVC
   case OPCODE_BVC_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_v == false) {
+    if (emu->cpu.sr.bits.v == false) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BVC: 0x%04X\n", target_addr);
     } else {
@@ -624,7 +590,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // BVS
   case OPCODE_BVS_REL: {
     emu->cycles += 2;
-    if (emu->cpu.flag_v == true) {
+    if (emu->cpu.sr.bits.v == true) {
       const u16 target_addr = branch_rel(emu);
       LPRINTF("BVS: 0x%04X\n", target_addr);
     } else {
@@ -634,25 +600,25 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // CLC
   case OPCODE_CLC: {
-    emu->cpu.flag_c = false;
+    emu->cpu.sr.bits.c = false;
     emu->cycles += 2;
   } break;
 
     // CLD
   case OPCODE_CLD: {
-    emu->cpu.flag_d = false;
+    emu->cpu.sr.bits.d = false;
     emu->cycles += 2;
   } break;
 
     // CLI
   case OPCODE_CLI: {
-    emu->cpu.flag_i = false;
+    emu->cpu.sr.bits.i = false;
     emu->cycles += 2;
   } break;
 
     // CLV
   case OPCODE_CLV: {
-    emu->cpu.flag_v = false;
+    emu->cpu.sr.bits.v = false;
     emu->cycles += 2;
   } break;
 
@@ -905,7 +871,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_JSR_ABS: {
     const u16 jmp_addr = fetch_word(emu);
     push_callstack(emu);
-    // LPRINTF( "JSR_ABS: 0x%04x\n", jmp_addr);
+    LPRINTF( "JSR_ABS: 0x%04x\n", jmp_addr);
     emu->cpu.pc = jmp_addr;
     emu->cycles += 6;
   } break;
@@ -1129,7 +1095,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // PHP
   case OPCODE_PHP: {
-    stack_push(emu, cpu_get_sr(&emu->cpu));
+    stack_push(emu, emu->cpu.sr.byte);
     emu->cycles += 3;
   } break;
 
@@ -1141,7 +1107,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // PLP
   case OPCODE_PLP: {
     const u8 sr = stack_pull(emu);
-    cpu_set_sr_from_byte(&emu->cpu, sr);
+    emu->cpu.sr.byte = sr;
     emu->cycles += 4;
   } break;
 
@@ -1200,7 +1166,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // RTI
   case OPCODE_RTI: {
     pull_callstack(emu);
-    emu->cpu.flag_i = false;
+    emu->cpu.sr.bits.i = false;
     emu->is_running = true;
   } break;
 
@@ -1263,19 +1229,19 @@ void emu_tick(Emulator *emu, const bool debug_output) {
 
     // SEC
   case OPCODE_SEC: {
-    emu->cpu.flag_c = true;
+    emu->cpu.sr.bits.c = true;
     emu->cycles += 2;
   } break;
 
     // SED
   case OPCODE_SED: {
-    emu->cpu.flag_d = true;
+    emu->cpu.sr.bits.d = true;
     emu->cycles += 2;
   } break;
 
     // SEI
   case OPCODE_SEI: {
-    emu->cpu.flag_i = true;
+    emu->cpu.sr.bits.i = true;
     emu->cycles += 2;
   } break;
 

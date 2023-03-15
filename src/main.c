@@ -67,7 +67,7 @@ i32 main(i32 argc, char *argv[]) {
         printf("Emulator halted at %llu cycles\n", emu.cycles);
         break;
       }
-      if (emu.cycles % 128000000 == 0) {
+      if (emu.cycles % 1260000000 == 0) {
         clock_t current_time = clock();
         f64 d = (f64)(current_time - prev_time) / (f64)CLOCKS_PER_SEC;
         f64 clock_speed = (f64)(emu.cycles - prev_cycles) * (1.0f / d) / 10000000.0f;
