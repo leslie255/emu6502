@@ -28,11 +28,15 @@ typedef struct CPU {
   } sr;
 } CPU;
 
+#define LOG_BUF_SIZE 1024
+
 typedef struct Emulator {
   CPU cpu;
   u8 mem[MEM_SIZE];
   u64 cycles;
   bool is_running;
+  bool debug_output;
+  char log_buf[LOG_BUF_SIZE];
 } Emulator;
 
 // Initialize the memory
@@ -50,7 +54,7 @@ void cpu_reset(CPU *cpu);
 void cpu_debug_print(const CPU *cpu);
 
 // Initialize the emulator
-void emu_init(Emulator *emu);
+void emu_init(Emulator *emu, bool debug_output);
 
 // Outputs the stack (memory address 0x0100 ~ 0x01FF)
 // Output has newline characters
@@ -62,6 +66,4 @@ u8 emu_read_mem_byte(const Emulator *emu, u16 addr);
 u16 emu_read_mem_word(const Emulator *emu, u16 addr);
 
 // Execute one instruction
-// `debug_output`: whether or not to output debug information for every
-// interrupt and jump instruction
-void emu_tick(Emulator *emu, bool debug_output);
+void emu_tick(Emulator *emu);

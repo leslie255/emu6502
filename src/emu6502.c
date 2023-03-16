@@ -4,15 +4,10 @@
 #include <ncurses.h>
 #include <stdarg.h>
 
-#define LOG_BUF_SIZE 1024
-
-static bool debug_output_enabled;
-static char log_buf[LOG_BUF_SIZE] = {0};
-
-#define LPRINTF(...)                                                           \
-  if (debug_output_enabled) {                                                  \
-    const usize i = strlen(log_buf);                                           \
-    char *buff = &log_buf[i];                                                  \
+#define LPRINTF(EMU, ...)                                                      \
+  if (EMU->debug_output) {                                                     \
+    const usize i = strlen(emu->log_buf);                                      \
+    char *buff = &emu->log_buf[i];                                             \
     sprintf(buff, __VA_ARGS__);                                                \
   }
 
@@ -45,11 +40,12 @@ void cpu_debug_print(const CPU *cpu) {
          zero_or_one(cpu->sr.bits.n));
 }
 
-void emu_init(Emulator *emu) {
+void emu_init(Emulator *emu, bool debug_output) {
   cpu_reset(&emu->cpu);
   mem_init(emu->mem);
   emu->cycles = 0;
   emu->is_running = true;
+  emu->debug_output = debug_output;
 }
 
 // fetch 1 byte from memory on position of PC
@@ -153,7 +149,7 @@ static inline void set_nz_flags_y(Emulator *emu) {
 }
 
 static inline void cmp(Emulator *emu, const u8 lhs, const u8 rhs) {
-  LPRINTF("cmp: 0x%02X vs 0x%02X\n", lhs, rhs);
+  LPRINTF(emu, "cmp: 0x%02X vs 0x%02X\n", lhs, rhs);
   const u8 sub_result = (lhs - rhs);
   set_nz_flags(emu, sub_result);
   emu->cpu.sr.bits.c = (lhs >= rhs);
@@ -175,6 +171,7 @@ static inline void op_adc(Emulator *emu, const u8 rhs) {
   const auto f = emu->cpu.sr.bits.d ? carrying_bcd_add_u8 : carrying_add_u8;
   const auto sum_carry = f(emu->cpu.a, rhs, emu->cpu.sr.bits.c);
   LPRINTF(
+      emu,
       "%02X(a) + %02X(m) + %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
       emu->cpu.a, rhs, emu->cpu.sr.bits.c, sum_carry.result, sum_carry.carry,
       emu->cpu.sr.bits.d ? "on" : "off");
@@ -188,6 +185,7 @@ static inline void op_sbc(Emulator *emu, const u8 rhs) {
   const auto f = emu->cpu.sr.bits.d ? carrying_bcd_sub_u8 : carrying_sub_u8;
   const auto dif_carry = f(emu->cpu.a, rhs, emu->cpu.sr.bits.c);
   LPRINTF(
+      emu,
       "%02X(a) - %02X(m) - %01X(c) = %02X(s) ... %1X(c)\ndecimal mode: %s\n",
       emu->cpu.a, rhs, emu->cpu.sr.bits.c, dif_carry.result, dif_carry.carry,
       emu->cpu.sr.bits.d ? "on" : "off");
@@ -293,7 +291,7 @@ static inline u8 stack_pull(Emulator *emu) {
 // Used for function call
 static inline void push_callstack(Emulator *emu) {
   const u16 pc = emu->cpu.pc;
-  LPRINTF("PC pushed: %04X\n", pc);
+  LPRINTF(emu, "PC pushed: %04X\n", pc);
   stack_push(emu, pc & 0x00FF);
   stack_push(emu, pc >> 8);
   stack_push(emu, emu->cpu.sr.byte);
@@ -306,7 +304,7 @@ static inline void pull_callstack(Emulator *emu) {
   u16 pc = (u16)(stack_pull(emu) << 8);
   pc |= stack_pull(emu);
   emu->cpu.pc = pc;
-  LPRINTF("PC pulled: %04X\n", pc);
+  LPRINTF(emu, "PC pulled: %04X\n", pc);
 }
 
 void emu_print_stack(const Emulator *emu) {
@@ -338,11 +336,9 @@ u16 emu_read_mem_word(const Emulator *emu, const u16 addr) {
   return data;
 }
 
-void emu_tick(Emulator *emu, const bool debug_output) {
-  debug_output_enabled = debug_output;
-
+void emu_tick(Emulator *emu) {
 #define PRINT_STAT(...)                                                        \
-  if (debug_output) {                                                          \
+  if (emu->debug_output) {                                                     \
     printw(""__VA_ARGS__);                                                     \
     printw("Opcode:\t0x%02X\n"                                                 \
            "Addr:\t0x%04X\n"                                                   \
@@ -352,8 +348,8 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     cpu_debug_print(&emu->cpu);                                                \
     printw("Stack:\n");                                                        \
     emu_print_stack(emu);                                                      \
-    printw("log: -----------\n%s----------\n", log_buf);                       \
-    bzero(log_buf, sizeof(log_buf));                                           \
+    printw("log: -----------\n%s----------\n", emu->log_buf);                  \
+    bzero(&emu->log_buf, LOG_BUF_SIZE);                                        \
   }
 
   const u8 opcode = fetch_byte(emu);
@@ -492,9 +488,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.c == false) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BCC: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BCC: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BCC: not jumped\n");
+      LPRINTF(emu, "BCC: not jumped\n");
     }
   } break;
 
@@ -503,9 +499,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.c == true) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BCC: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BCC: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BCS: not jumped\n");
+      LPRINTF(emu, "BCS: not jumped\n");
     }
   } break;
 
@@ -514,9 +510,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.z == true) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BEQ: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BEQ: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BEQ: not jumped\n");
+      LPRINTF(emu, "BEQ: not jumped\n");
     }
   } break;
 
@@ -539,9 +535,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.n == true) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BMI: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BMI: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BMI: not jumped\n");
+      LPRINTF(emu, "BMI: not jumped\n");
     }
   } break;
 
@@ -550,9 +546,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.z == false) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BNE: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BNE: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BNE: not jumped\n");
+      LPRINTF(emu, "BNE: not jumped\n");
     }
   } break;
 
@@ -561,15 +557,15 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.n == false) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BPL: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BPL: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BPL: not jumped\n");
+      LPRINTF(emu, "BPL: not jumped\n");
     }
   } break;
 
     // BRK
   case OPCODE_BRK: {
-    LPRINTF("Interrupted (BRK)\n");
+    LPRINTF(emu, "Interrupted (BRK)\n");
     cpu_reset_sr(&emu->cpu);
     push_callstack(emu);
     emu->cpu.sr.bits.i = true;
@@ -581,9 +577,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.v == false) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BVC: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BVC: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BVC: not jumped\n");
+      LPRINTF(emu, "BVC: not jumped\n");
     }
   } break;
 
@@ -592,9 +588,9 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.v == true) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF("BVS: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BVS: 0x%04X\n", target_addr);
     } else {
-      LPRINTF("BVS: not jumped\n");
+      LPRINTF(emu, "BVS: not jumped\n");
     }
   } break;
 
@@ -855,14 +851,14 @@ void emu_tick(Emulator *emu, const bool debug_output) {
     // JMP
   case OPCODE_JMP_ABS: {
     u16 addr = fetch_word(emu);
-    LPRINTF("JMP_ABS: 0x%04x\n", addr);
+    LPRINTF(emu, "JMP_ABS: 0x%04x\n", addr);
     emu->cpu.pc = addr;
     emu->cycles += 3;
   } break;
   case OPCODE_JMP_IND: {
     u16 addr0 = fetch_word(emu);
     u16 addr = emu_read_mem_word(emu, addr0);
-    LPRINTF("JMP_IND: 0x%04x\n", addr);
+    LPRINTF(emu, "JMP_IND: 0x%04x\n", addr);
     emu->cpu.pc = addr;
     emu->cycles += 5;
   } break;
@@ -871,7 +867,7 @@ void emu_tick(Emulator *emu, const bool debug_output) {
   case OPCODE_JSR_ABS: {
     const u16 jmp_addr = fetch_word(emu);
     push_callstack(emu);
-    LPRINTF( "JSR_ABS: 0x%04x\n", jmp_addr);
+    LPRINTF(emu, "JSR_ABS: 0x%04x\n", jmp_addr);
     emu->cpu.pc = jmp_addr;
     emu->cycles += 6;
   } break;
