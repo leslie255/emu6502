@@ -45,17 +45,29 @@ i32 main(i32 argc, char *argv[]) {
   emu_init(&emu, !less_io);
   MemWriter writer = memw_init(emu.mem);
 
-  mem_write_byte(&writer, OPCODE_JMP_ABS);
+  // starts on 0xFFFC by default
+  mem_write_byte(&writer, OPCODE_JMP_ABS); // JMP 0x0800
   mem_write_word(&writer, 0x0800);
 
   writer.head = 0x0800;
-  mem_write_byte(&writer, OPCODE_JSR_ABS);
-  mem_write_word(&writer, 0x1020);
-  mem_write_byte(&writer, OPCODE_JMP_ABS);
+  mem_write_byte(&writer, OPCODE_JSR_ABS); // JSR 0x1000
+  mem_write_word(&writer, 0x1000);
+  mem_write_byte(&writer, OPCODE_JMP_ABS); // JMP 0x0800
   mem_write_word(&writer, 0x0800);
 
-  writer.head = 0x1020;
-  mem_write_byte(&writer, OPCODE_RTS);
+  writer.head = 0x1000;
+  mem_write_byte(&writer, OPCODE_LDA_IM); // LDA $0
+  mem_write_byte(&writer, 0x00);
+  mem_write_byte(&writer, OPCODE_SED);    // SED ; enable decimal mode
+  mem_write_byte(&writer, OPCODE_ADC_IM); // ADC $1
+  mem_write_byte(&writer, 0x01);
+  mem_write_byte(&writer, OPCODE_BCS_REL); // BCS +4 ; branch if carry set
+  mem_write_byte(&writer, 4);
+  mem_write_byte(&writer, OPCODE_BCC_REL); // BCC +3 ; branch if carry clear
+  mem_write_byte(&writer, 3);
+  mem_write_byte(&writer, OPCODE_RTS);     // RTS
+  mem_write_byte(&writer, OPCODE_JMP_ABS); // JMP 0x1000
+  mem_write_word(&writer, 0x1000);
 
   printf("initialized\n");
 
@@ -67,10 +79,14 @@ i32 main(i32 argc, char *argv[]) {
         printf("Emulator halted at %llu cycles\n", emu.cycles);
         break;
       }
-      if (emu.cycles % 1260000000 == 0) {
+      // sometimes in a repeating loop the number could not be reached because
+      // some instructions have odd-numbered cycles, therefore requiring the
+      // `... == 0 || ... == 1`
+      if (emu.cycles % 370440000 == 0 || emu.cycles % 370440000 == 1) {
         clock_t current_time = clock();
         f64 d = (f64)(current_time - prev_time) / (f64)CLOCKS_PER_SEC;
-        f64 clock_speed = (f64)(emu.cycles - prev_cycles) * (1.0f / d) / 10000000.0f;
+        f64 clock_speed =
+            (f64)(emu.cycles - prev_cycles) * (1.0f / d) / 10000000.0f;
         printf("%.2lf\tMHz\n", clock_speed);
         prev_time = current_time;
         prev_cycles = emu.cycles;

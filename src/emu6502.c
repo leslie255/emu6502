@@ -499,8 +499,9 @@ void emu_tick(Emulator *emu) {
     emu->cycles += 2;
     if (emu->cpu.sr.bits.c == true) {
       const u16 target_addr = branch_rel(emu);
-      LPRINTF(emu, "BCC: 0x%04X\n", target_addr);
+      LPRINTF(emu, "BCS: 0x%04X\n", target_addr);
     } else {
+      emu->cpu.pc++;
       LPRINTF(emu, "BCS: not jumped\n");
     }
   } break;
@@ -1364,6 +1365,7 @@ void emu_tick(Emulator *emu) {
 
   default: {
     emu->is_running = false;
+    LPRINTF(emu, "Illegal opcode: 0x%02X\n", opcode);
   } break;
   }
   PRINT_STAT("", opcode);
