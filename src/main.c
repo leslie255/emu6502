@@ -94,16 +94,28 @@ i32 main(i32 argc, char *argv[]) {
     endwin();
   } else {
     clock_t prev_time = clock();
-    u64 prev_cycles = 1;
+    // don't print cycle number for the first seconds or so.
     while (true) {
       if (!emu.is_running) {
         printf("Emulator halted at %llu cycles\n", emu.cycles);
+        return 0;
+      }
+      emu_tick(&emu);
+      if (emu.cycles % 100000000 == 0 || emu.cycles % 100000000 == 1) {
         break;
       }
+    }
+    u64 prev_cycles = emu.cycles;
+    while (true) {
+      if (!emu.is_running) {
+        printf("Emulator halted at %llu cycles\n", emu.cycles);
+        return 0;
+      }
+      emu_tick(&emu);
       // sometimes in a repeating loop the number could not be reached because
-      // some instructions have odd-numbered cycles, therefore requiring the
+      // some loops are even-numbered cycles, therefore requiring the
       // `... == 0 || ... == 1`
-      if (emu.cycles % 370440000 == 0 || emu.cycles % 370440000 == 1) {
+      if (emu.cycles % 100000000 == 0 || emu.cycles % 100000000 == 1) {
         clock_t current_time = clock();
         f64 d = (f64)(current_time - prev_time) / (f64)CLOCKS_PER_SEC;
         f64 clock_speed =
@@ -112,9 +124,6 @@ i32 main(i32 argc, char *argv[]) {
         prev_time = current_time;
         prev_cycles = emu.cycles;
       }
-      emu_tick(&emu);
     }
   }
-
-  return 0;
 }
