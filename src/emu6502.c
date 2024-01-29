@@ -1,8 +1,10 @@
 #include "emu6502.h"
 #include "calc.h"
 
+#include <arm/endian.h>
 #include <ncurses.h>
 #include <stdarg.h>
+#include <sys/_endian.h>
 
 #define LPRINTF(EMU, ...)                                                      \
   if (EMU->debug_output) {                                                     \
@@ -64,9 +66,7 @@ static inline u16 fetch_word(Emulator *emu) {
   data |= emu->mem[emu->cpu.pc] << 8;
   emu->cpu.pc++;
 
-  if (BIG_ENDIAN) {
-    data = swap_bytes(data);
-  }
+  data = ntohs(data);
 
   return data;
 }
@@ -329,9 +329,7 @@ u16 emu_read_mem_word(const Emulator *emu, const u16 addr) {
   u16 data = emu->mem[addr];
   data |= emu->mem[addr + 1] << 8;
 
-  if (htonl(42) == 42) {
-    data = swap_bytes(data);
-  }
+  data = htons(data);
 
   return data;
 }

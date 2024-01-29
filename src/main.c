@@ -4,6 +4,7 @@
 #include "opcode.h"
 
 #include <ncurses.h>
+#include <stdio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -31,18 +32,19 @@ void mem_write_word(MemWriter *memw, u16 word) {
 
 i32 main(i32 argc, char *argv[]) {
 
-  bool less_io = false;
+  bool dbg = false;
 
   for (i32 i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--less-io") == 0) {
-      less_io = true;
+    if (strcmp(argv[i], "--dbg") == 0) {
+      dbg = true;
     } else {
-      printf("invalid argument: %s", argv[i]);
+      printf("invalid argument: %s\n", argv[i]);
+      return 1;
     }
   }
 
   Emulator emu;
-  emu_init(&emu, !less_io);
+  emu_init(&emu, dbg);
   MemWriter writer = memw_init(emu.mem);
 
   // starts on 0xFFFC by default
@@ -71,7 +73,26 @@ i32 main(i32 argc, char *argv[]) {
 
   printf("initialized\n");
 
-  if (less_io) {
+  if (dbg) {
+    initscr();
+    noecho();
+    while (true) {
+      clear();
+      emu_tick(&emu);
+      refresh();
+      if (emu.is_running) {
+        printw("\nPress n to tick forward 1 instruction\n");
+        while (getch() != 'n')
+          ;
+      } else {
+        printw("\nEmulation halted, press q to quit\n");
+        while (getch() != 'q')
+          ;
+        break;
+      }
+    }
+    endwin();
+  } else {
     clock_t prev_time = clock();
     u64 prev_cycles = 1;
     while (true) {
@@ -93,25 +114,6 @@ i32 main(i32 argc, char *argv[]) {
       }
       emu_tick(&emu);
     }
-  } else {
-    initscr();
-    noecho();
-    while (true) {
-      clear();
-      emu_tick(&emu);
-      refresh();
-      if (emu.is_running) {
-        printw("\nPress n to tick forward 1 instruction\n");
-        while (getch() != 'n')
-          ;
-      } else {
-        printw("\nEmulation halted, press q to quit\n");
-        while (getch() != 'q')
-          ;
-        break;
-      }
-    }
-    endwin();
   }
 
   return 0;

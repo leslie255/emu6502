@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wconversions --std=gnu2x -lncurses
+CFLAGS = -Wall -Wconversion --std=gnu2x -lncurses
 
 OPT_LEVEL = -O2
 

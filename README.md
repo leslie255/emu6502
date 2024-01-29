@@ -11,7 +11,7 @@ $ mkdir bin
 $ make all && ./bin/emu6502
 ```
 
-By default, the emulator outputs a CLI debug interface that traces the state of the CPU and memory step by step. This can slow down the performance significantly. To run the emulator at maximum speed, add `--less-io` option to only output a `{x} MHz` prompt every 128 million cycles.
+There is also a `--dbg` option for instruction-by-instruction running while printing the entire stack, values of registers, etc.
 
 Note that the emulator likely won't work in big endian platforms.
 
